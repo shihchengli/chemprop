@@ -988,7 +988,7 @@ class HyperoptArgs(TrainArgs):
 class SklearnTrainArgs(TrainArgs):
     """:class:`SklearnTrainArgs` includes :class:`TrainArgs` along with additional arguments for training a scikit-learn model."""
 
-    model_type: Literal['random_forest', 'svm']
+    model_type: Literal['random_forest', 'svm', 'xgboost']
     """scikit-learn model to use."""
     class_weight: Literal['balanced'] = None
     """How to weight classes (None means no class balance)."""

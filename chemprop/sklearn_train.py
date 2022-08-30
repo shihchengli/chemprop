@@ -10,6 +10,8 @@ from sklearn.svm import SVC, SVR
 from sklearn.linear_model import SGDClassifier, SGDRegressor
 from tqdm import trange, tqdm
 
+import xgboost as xgb
+
 from chemprop.args import SklearnTrainArgs
 from chemprop.data import MoleculeDataset, split_data, get_task_names, get_data
 from chemprop.features import get_features_generator
@@ -317,6 +319,8 @@ def run_sklearn(args: SklearnTrainArgs,
             model = RandomForestRegressor(n_estimators=args.num_trees, n_jobs=-1, random_state=args.seed)
         elif args.model_type == 'svm':
             model = SVR()
+        elif args.model_type == 'xgboost':
+            model = xgb.XGBRegressor()
         else:
             raise ValueError(f'Model type "{args.model_type}" not supported')
     elif args.dataset_type == 'classification':
