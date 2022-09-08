@@ -320,7 +320,7 @@ def run_sklearn(args: SklearnTrainArgs,
         elif args.model_type == 'svm':
             model = SVR()
         elif args.model_type == 'xgboost':
-            model = xgb.XGBRegressor()
+            model = xgb.XGBRegressor(n_estimators=args.num_trees, max_depth=args.max_depth)
         else:
             raise ValueError(f'Model type "{args.model_type}" not supported')
     elif args.dataset_type == 'classification':

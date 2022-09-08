@@ -1002,6 +1002,8 @@ class SklearnTrainArgs(TrainArgs):
     """Number of random forest trees."""
     impute_mode: Literal['single_task', 'median', 'mean', 'linear','frequent'] = None
     """How to impute missing data (None means no imputation)."""
+    max_depth: int = 6
+    """Number of random forest trees."""
 
 
 class SklearnPredictArgs(CommonArgs):
