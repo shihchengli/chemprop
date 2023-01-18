@@ -38,18 +38,8 @@ def predict(model: Union[RandomForestRegressor, RandomForestClassifier, SVR, SVC
         if len(preds.shape) == 1:
             preds = [[pred] for pred in preds]
     elif dataset_type == 'classification':
-        if model_type == 'random_forest':
-            preds = model.predict_proba(features)
-
-            if type(preds) == list:
-                # Multiple tasks
-                num_tasks, num_preds = len(preds), len(preds[0])
-                preds = [[preds[i][j, 1] for i in range(num_tasks)] for j in range(num_preds)]
-            else:
-                # One task
-                preds = [[preds[i, 1]] for i in range(len(preds))]
-        elif model_type == 'svm':
-            preds = model.decision_function(features)
+        if model_type in ['random_forest', 'svm', 'xgboost']:
+            preds = model.predict(features)
             preds = [[pred] for pred in preds]
         else:
             raise ValueError(f'Model type "{model_type}" not supported')
@@ -328,6 +318,8 @@ def run_sklearn(args: SklearnTrainArgs,
             model = RandomForestClassifier(n_estimators=args.num_trees, n_jobs=-1, class_weight=args.class_weight, random_state=args.seed)
         elif args.model_type == 'svm':
             model = SVC()
+        elif args.model_type == 'xgboost':
+            model = xgb.XGBClassifier(n_estimators=args.num_trees, n_jobs=-1, random_state=args.seed)
         else:
             raise ValueError(f'Model type "{args.model_type}" not supported')
     else:
