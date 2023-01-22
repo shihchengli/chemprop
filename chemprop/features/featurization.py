@@ -105,10 +105,14 @@ def set_reaction(reaction: bool, mode: str) -> None:
     """
     PARAMS.REACTION = reaction
     if reaction:
-        PARAMS.EXTRA_ATOM_FDIM = PARAMS.ATOM_FDIM - PARAMS.MAX_ATOMIC_NUM - 1
-        PARAMS.EXTRA_BOND_FDIM = PARAMS.BOND_FDIM
         PARAMS.REACTION_MODE = mode
-        
+        if mode == "reac_prod_avg":
+            PARAMS.EXTRA_ATOM_FDIM = 0
+            PARAMS.EXTRA_BOND_FDIM = 0
+        else:
+            PARAMS.EXTRA_ATOM_FDIM = PARAMS.ATOM_FDIM - PARAMS.MAX_ATOMIC_NUM - 1
+            PARAMS.EXTRA_BOND_FDIM = PARAMS.BOND_FDIM
+
 def is_explicit_h(is_mol: bool = True) -> bool:
     r"""Returns whether to retain explicit Hs (for reactions only)"""
     if not is_mol:
@@ -403,7 +407,7 @@ class MolGraph:
             ri2pi, pio, rio = map_reac_to_prod(mol_reac, mol_prod)
            
             # Get atom features
-            if self.reaction_mode in ['reac_diff','prod_diff', 'reac_prod']:
+            if self.reaction_mode in ['reac_diff', 'prod_diff', 'reac_prod', 'reac_prod_avg']:
                 #Reactant: regular atom features for each atom in the reactants, as well as zero features for atoms that are only in the products (indices in pio)
                 f_atoms_reac = [atom_features(atom) for atom in mol_reac.GetAtoms()] + [atom_features_zeros(mol_prod.GetAtomWithIdx(index)) for index in pio]
                 
@@ -428,6 +432,8 @@ class MolGraph:
                 self.f_atoms = [x+y[PARAMS.MAX_ATOMIC_NUM+1:] for x,y in zip(f_atoms_reac, f_atoms_diff)]
             elif self.reaction_mode in ['prod_diff', 'prod_diff_balance']:
                 self.f_atoms = [x+y[PARAMS.MAX_ATOMIC_NUM+1:] for x,y in zip(f_atoms_prod, f_atoms_diff)]
+            elif self.reaction_mode in ['reac_prod_avg', 'reac_prod_avg_balance']:
+                self.f_atoms = [[(i+j)/2 for i, j in zip(x, y)] for x,y in zip(f_atoms_reac, f_atoms_prod)]
             self.n_atoms = len(self.f_atoms)
             n_atoms_reac = mol_reac.GetNumAtoms()
 
@@ -440,7 +446,7 @@ class MolGraph:
                 for a2 in range(a1 + 1, self.n_atoms):
                     if a1 >= n_atoms_reac and a2 >= n_atoms_reac: # Both atoms only in product
                         bond_prod = mol_prod.GetBondBetweenAtoms(pio[a1 - n_atoms_reac], pio[a2 - n_atoms_reac])
-                        if self.reaction_mode in ['reac_prod_balance', 'reac_diff_balance', 'prod_diff_balance']:
+                        if self.reaction_mode in ['reac_prod_balance', 'reac_diff_balance', 'prod_diff_balance', 'reac_prod_avg_balance']:
                             bond_reac = bond_prod
                         else:
                             bond_reac = None
@@ -455,7 +461,7 @@ class MolGraph:
                         if a1 in ri2pi.keys() and a2 in ri2pi.keys():
                             bond_prod = mol_prod.GetBondBetweenAtoms(ri2pi[a1], ri2pi[a2]) #Both atoms in both reactant and product
                         else:
-                            if self.reaction_mode in ['reac_prod_balance', 'reac_diff_balance', 'prod_diff_balance']:
+                            if self.reaction_mode in ['reac_prod_balance', 'reac_diff_balance', 'prod_diff_balance', 'reac_prod_avg_balance']:
                                 if a1 in ri2pi.keys() or a2 in ri2pi.keys():
                                     bond_prod = None # One atom only in reactant
                                 else:
@@ -476,6 +482,8 @@ class MolGraph:
                         f_bond = f_bond_reac + f_bond_diff
                     elif self.reaction_mode in ['prod_diff', 'prod_diff_balance']:
                         f_bond = f_bond_prod + f_bond_diff
+                    elif self.reaction_mode in ['reac_prod_avg', 'reac_prod_avg_balance']:
+                        f_bond = [(i+j)/2 for i, j in zip(f_bond_reac, f_bond_prod)]
                     self.f_bonds.append(self.f_atoms[a1] + f_bond)
                     self.f_bonds.append(self.f_atoms[a2] + f_bond)
 
