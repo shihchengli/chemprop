@@ -255,7 +255,7 @@ def run_training(args: TrainArgs,
         # Load/build model
         if args.checkpoint_paths is not None:
             debug(f'Loading model {model_idx} from {args.checkpoint_paths[model_idx]}')
-            model = load_checkpoint(args.checkpoint_paths[model_idx], logger=logger)
+            model = load_checkpoint(args.checkpoint_paths[model_idx], args=args, logger=logger)
         else:
             debug(f'Building model {model_idx}')
             model = MoleculeModel(args)

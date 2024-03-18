@@ -92,7 +92,7 @@ def save_checkpoint(
 
 
 def load_checkpoint(
-    path: str, device: torch.device = None, logger: logging.Logger = None
+    path: str, args: TrainArgs = None, device: torch.device = None, logger: logging.Logger = None
 ) -> MoleculeModel:
     """
     Loads a model checkpoint.
@@ -109,9 +109,14 @@ def load_checkpoint(
 
     # Load model and args
     state = torch.load(path, map_location=lambda storage, loc: storage)
-    args = TrainArgs()
-    args.from_dict(vars(state["args"]), skip_unsettable=True)
     loaded_state_dict = state["state_dict"]
+
+    if args is None:
+        args = TrainArgs()
+        args.from_dict(vars(state["args"]), skip_unsettable=True)
+        no_overwrite_readout = False
+    else:
+        no_overwrite_readout = args.no_overwrite_readout
 
     if device is not None:
         args.device = device
@@ -130,6 +135,9 @@ def load_checkpoint(
             param_name = loaded_param_name.replace("ffn", "readout")
         else:
             param_name = loaded_param_name
+
+        if no_overwrite_readout and param_name.startswith("readout"):
+            continue
 
         # Load pretrained parameter, skipping unmatched parameters
         if param_name not in model_state_dict:

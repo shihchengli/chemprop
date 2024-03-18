@@ -312,6 +312,8 @@ class TrainArgs(CommonArgs):
     """Directory where model checkpoints will be saved."""
     checkpoint_frzn: str = None
     """Path to model checkpoint file to be loaded for overwriting and freezing weights."""
+    no_overwrite_readout: bool = False
+    """Whether to overwrite the model weights for readout layers."""
     save_smiles_splits: bool = False
     """Save smiles for each train/val/test splits for prediction convenience later."""
     test: bool = False
