@@ -12,7 +12,7 @@ from chemprop.nn_utils import activate_dropout
 def predict(
     model: MoleculeModel,
     data_loader: MoleculeDataLoader,
-    disable_progress_bar: bool = False,
+    disable_progress_bar: bool = True,
     scaler: StandardScaler = None,
     atom_bond_scaler: AtomBondScaler = None,
     return_unc_parameters: bool = False,
