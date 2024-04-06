@@ -4,6 +4,7 @@ from typing import Callable, Dict, List, Set, Tuple
 import numpy as np
 from rdkit import Chem
 
+import chemprop
 from chemprop.args import InterpretArgs
 from chemprop.data import get_data_from_smiles, get_header, get_smiles, MoleculeDataLoader, MoleculeDataset
 from chemprop.train import predict
@@ -309,10 +310,20 @@ def interpret(args: InterpretArgs) -> None:
 
     global C_PUCT, MIN_ATOMS
 
-    chemprop_model = ChempropModel(args)
+    # chemprop_model = ChempropModel(args)
 
+    # def scoring_function(smiles: List[str]) -> List[float]:
+    #     return chemprop_model(smiles)[:, args.property_id - 1]
+
+    arguments = [
+        '--test_path', '/dev/null',
+        '--preds_path', '/dev/null',
+        '--checkpoint_dir', args.checkpoint_dir,
+    ]
+    preds_args = chemprop.args.PredictArgs().parse_args(arguments)
+    model_objects = chemprop.train.load_model(args=preds_args)
     def scoring_function(smiles: List[str]) -> List[float]:
-        return chemprop_model(smiles)[:, args.property_id - 1]
+        return chemprop.train.make_predictions(args=preds_args, smiles=smiles, model_objects=model_objects)[0]
 
     C_PUCT = args.c_puct
     MIN_ATOMS = args.min_atoms
