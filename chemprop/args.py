@@ -322,6 +322,8 @@ class TrainArgs(CommonArgs):
     """The number of batches between each logging of the training loss."""
     show_individual_scores: bool = False
     """Show all scores for individual targets, not just average, at the end."""
+    validate_on_first_target: bool = False
+    """Save model if validation score on first target improves even if overall score drops."""
     cache_cutoff: float = 10000
     """
     Maximum number of molecules in dataset to allow caching.
@@ -355,7 +357,7 @@ class TrainArgs(CommonArgs):
     Only relevant if :code:`number_of_molecules > 1`"""
     dropout: float = 0.0
     """Dropout probability."""
-    activation: Literal['ReLU', 'LeakyReLU', 'PReLU', 'tanh', 'SELU', 'ELU'] = 'ReLU'
+    activation: Literal['ReLU', 'LeakyReLU', 'PReLU', 'tanh', 'SELU', 'ELU', 'SiLU', 'GELU'] = 'ReLU'
     """Activation function."""
     atom_messages: bool = False
     """Centers messages on atoms instead of on bonds."""
@@ -1140,8 +1142,9 @@ class HyperoptArgs(TrainArgs):
         supported_keywords = [
             "basic", "learning_rate", "linked_hidden_size", "all",
             "activation", "aggregation", "aggregation_norm", "batch_size", "depth",
-            "dropout", "ffn_hidden_size", "ffn_num_layers", "final_lr", "hidden_size",
-            "init_lr", "max_lr", "warmup_epochs"
+            "dropout", "ffn_hidden_size", "ffn_num_layers", "hidden_size",
+            "final_lr", "init_lr", "max_lr", "warmup_epochs",
+            "depth_solvent", "hidden_size_solvent",
         ]
         supported_parameters = [
             "activation", "aggregation", "aggregation_norm", "batch_size", "depth",

@@ -96,6 +96,10 @@ def get_activation_function(activation: str) -> nn.Module:
         return nn.SELU()
     elif activation == 'ELU':
         return nn.ELU()
+    elif activation == 'SiLU':
+        return nn.SiLU()
+    elif activation == 'GELU':
+        return nn.GELU()
     else:
         raise ValueError(f'Activation "{activation}" not supported.')
 

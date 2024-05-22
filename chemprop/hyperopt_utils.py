@@ -22,21 +22,25 @@ def build_search_space(search_parameters: List[str], train_epochs: int = None) -
     :return: A dictionary keyed by the parameter names of hyperopt search functions.
     """
     available_spaces = {
-        "activation": hp.choice(
-            "activation", options=["ReLU", "LeakyReLU", "PReLU", "tanh", "SELU", "ELU"]
-        ),
-        "aggregation": hp.choice("aggregation", options=["mean", "sum", "norm"]),
-        "aggregation_norm": hp.quniform("aggregation_norm", low=1, high=200, q=1),
-        "batch_size": hp.quniform("batch_size", low=5, high=200, q=5),
-        "depth": hp.quniform("depth", low=2, high=6, q=1),
-        "dropout": hp.quniform("dropout", low=0.0, high=0.4, q=0.05),
-        "ffn_hidden_size": hp.quniform("ffn_hidden_size", low=300, high=2400, q=100),
+        "activation": hp.choice("activation", options=['ReLU', 'LeakyReLU', 'PReLU', 'SELU', 'ELU', 'SiLU', 'GELU']),
+        "aggregation": hp.choice("aggregation", options=["sum", "norm"]),
+        "aggregation_norm": hp.quniform("aggregation_norm", low=10, high=100, q=10),
+        "batch_size": hp.choice("batch_size", options=[8, 16, 32, 64, 128]),
+        "dropout": hp.quniform("dropout", low=0.0, high=0.15, q=0.05),
+
+        "depth": hp.quniform("depth", low=3, high=6, q=1),
+        "hidden_size": hp.quniform("hidden_size", low=300, high=1000, q=100),
+
+        "ffn_hidden_size": hp.quniform("ffn_hidden_size", low=300, high=1200, q=100),
         "ffn_num_layers": hp.quniform("ffn_num_layers", low=1, high=3, q=1),
-        "final_lr_ratio": hp.loguniform("final_lr_ratio", low=np.log(1e-4), high=0.),
-        "hidden_size": hp.quniform("hidden_size", low=300, high=2400, q=100),
+        # "linked_hidden_size": hp.quniform("linked_hidden_size", low=300, high=1000, q=100),
+
+        "hidden_size_solvent": hp.quniform("hidden_size_solvent", low=300, high=800, q=100),
+        "depth_solvent": hp.quniform("depth_solvent", low=2, high=6, q=1),
+
+        "max_lr": hp.loguniform("max_lr", low=np.log(1e-4), high=np.log(1e-2)),
         "init_lr_ratio": hp.loguniform("init_lr_ratio", low=np.log(1e-4), high=0.),
-        "linked_hidden_size": hp.quniform("linked_hidden_size", low=300, high=2400, q=100),
-        "max_lr": hp.loguniform("max_lr", low=np.log(1e-6), high=np.log(1e-2)),
+        "final_lr_ratio": hp.loguniform("final_lr_ratio", low=np.log(1e-4), high=0.),
         "warmup_epochs": hp.quniform("warmup_epochs", low=1, high=train_epochs // 2, q=1)
     }
     space = {}

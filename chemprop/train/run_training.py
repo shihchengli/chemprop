@@ -23,7 +23,7 @@ from chemprop.data import get_class_sizes, get_data, MoleculeDataLoader, Molecul
 from chemprop.models import MoleculeModel
 from chemprop.nn_utils import param_count, param_count_all
 from chemprop.utils import build_optimizer, build_lr_scheduler, load_checkpoint, makedirs, \
-    save_checkpoint, save_smiles_splits, load_frzn_model, multitask_mean
+    save_checkpoint, save_smiles_splits, load_frzn_model, multitask_mean, plot_train_val_loss, plot_lr, plot_gnorm_pnorm
 
 
 def run_training(args: TrainArgs,
@@ -284,9 +284,14 @@ def run_training(args: TrainArgs,
 
         # Optimizers
         optimizer = build_optimizer(model, args)
+        info(f'Optimizer parameters are:\n{optimizer}\n')
 
         # Learning rate schedulers
         scheduler = build_lr_scheduler(optimizer, args)
+        info(f'Scheduler state dict is:')
+        for key, value in scheduler.state_dict().items():
+            info(f'{key}: {value}')
+        info('')
 
         # Run training
         best_score = float('inf') if args.minimize_score else -float('inf')
@@ -348,9 +353,10 @@ def run_training(args: TrainArgs,
                 metric=args.metric,
                 ignore_nan_metrics=args.ignore_nan_metrics
             )
-            if args.minimize_score and mean_val_score < best_score or \
-                    not args.minimize_score and mean_val_score > best_score:
-                best_score, best_epoch = mean_val_score, epoch
+            val_score = val_scores[args.metric][0] if args.validate_on_first_target else mean_val_score
+            if args.minimize_score and val_score < best_score or \
+                    not args.minimize_score and val_score > best_score:
+                best_score, best_epoch = val_score, epoch
                 save_checkpoint(os.path.join(save_dir, MODEL_FILE_NAME), model, scaler, features_scaler,
                                 atom_descriptor_scaler, bond_descriptor_scaler, atom_bond_scaler, args)
 
