@@ -90,6 +90,8 @@ def get_task_names(
     :return: A list of task names.
     """
     if target_columns is not None:
+        if loss_function == "quantile_interval":
+            return target_columns * 2
         return target_columns
 
     columns = get_header(path)
@@ -475,6 +477,8 @@ def get_data(path: str,
             ignore_columns=ignore_columns,
             loss_function=loss_function,
         )
+    elif loss_function == 'quantile_interval':
+        target_columns = target_columns * 2
 
     # Find targets provided as inequalities
     if loss_function == 'bounded_mse':
