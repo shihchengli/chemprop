@@ -23,6 +23,13 @@ class UncertaintyPredictor:
 UncertaintyPredictorRegistry = ClassRegistry[UncertaintyPredictor]()
 
 
+@UncertaintyPredictorRegistry.register(None)
+class NoUncertaintyPredictor(UncertaintyPredictor):
+    def _calc_uncertainty(self, batch, models) -> Tensor:
+        ...
+        return
+
+
 @UncertaintyPredictorRegistry.register("mve")
 class MVEPredictor(UncertaintyPredictor):
     def _calc_uncertainty(self, batch, models) -> Tensor:
