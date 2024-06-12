@@ -491,15 +491,16 @@ def get_data(path: str,
         if any([c not in fieldnames for c in target_columns]):
             raise ValueError(f'Data file did not contain all provided target columns: {target_columns}. Data file field names are: {fieldnames}')
 
-        all_smiles, all_targets, all_atom_targets, all_bond_targets, all_rows, all_features, all_phase_features, all_constraints_data, all_raw_constraints_data, all_weights, all_gt, all_lt = [], [], [], [], [], [], [], [], [], [], [], []
+        all_smiles, all_targets, all_atom_targets, all_bond_targets, all_molecule_targets, all_rows, all_features, all_phase_features, all_constraints_data, all_raw_constraints_data, all_weights, all_gt, all_lt = [], [], [], [], [], [], [], [], [], [], [], [], []
         for i, row in enumerate(tqdm(reader)):
             smiles = [row[c] for c in smiles_columns]
 
-            targets, atom_targets, bond_targets = [], [], []
+            targets, atom_targets, bond_targets, molecule_targets = [], [], [], []
             for column in target_columns:
                 value = row[column]
                 if value in ['', 'nan']:
                     targets.append(None)
+                    molecule_targets.append(None)
                 elif '>' in value or '<' in value:
                     if loss_function == 'bounded_mse':
                         targets.append(float(value.strip('<>')))
@@ -525,6 +526,7 @@ def get_data(path: str,
                         raise ValueError(f'Unrecognized targets of column {column} in {path}.')
                 else:
                     targets.append(float(value))
+                    molecule_targets.append(float(value))
 
             # Check whether all targets are None and skip if so
             if skip_none_targets and all(x is None for x in targets):
@@ -534,6 +536,7 @@ def get_data(path: str,
             all_targets.append(targets)
             all_atom_targets.append(atom_targets)
             all_bond_targets.append(bond_targets)
+            all_molecule_targets.append(molecule_targets)
 
             if features_data is not None:
                 all_features.append(features_data[i])
@@ -594,6 +597,8 @@ def get_data(path: str,
                 targets=targets,
                 atom_targets=all_atom_targets[i] if atom_targets else None,
                 bond_targets=all_bond_targets[i] if bond_targets else None,
+                atom_bond_targets=all_atom_targets[i] + all_bond_targets[i],
+                molecule_targets=all_molecule_targets[i] if molecule_targets else None,
                 row=all_rows[i] if store_row else None,
                 data_weight=all_weights[i] if data_weights is not None else None,
                 gt_targets=all_gt[i] if gt_targets is not None else None,

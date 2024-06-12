@@ -122,7 +122,7 @@ class MoleculeModel(nn.Module):
 
         # Create FFN layers
         if self.is_atom_bond_targets:
-            self.readout = MultiReadout(
+            self.atom_bond_readout = MultiReadout(
                 atom_features_size=atom_first_linear_dim,
                 bond_features_size=bond_first_linear_dim,
                 atom_hidden_size=args.ffn_hidden_size + args.atom_descriptors_size,
@@ -135,6 +135,16 @@ class MoleculeModel(nn.Module):
                 bond_constraints=args.bond_constraints,
                 shared_ffn=args.shared_atom_bond_ffn,
                 weights_ffn_num_layers=args.weights_ffn_num_layers,
+            )
+            self.molecule_readout = build_ffn(
+                first_linear_dim=atom_first_linear_dim,
+                hidden_size=args.ffn_hidden_size + args.atom_descriptors_size,
+                num_layers=args.ffn_num_layers,
+                output_size=self.relative_output_size * len(args.molecule_targets),
+                dropout=args.dropout,
+                activation=args.activation,
+                dataset_type=args.dataset_type,
+                spectra_activation=args.spectra_activation,
             )
         else:
             self.readout = build_ffn(
@@ -152,26 +162,30 @@ class MoleculeModel(nn.Module):
             if args.frzn_ffn_layers > 0:
                 if self.is_atom_bond_targets:
                     if args.shared_atom_bond_ffn:
-                        for param in list(self.readout.atom_ffn_base.parameters())[
+                        for param in list(self.atom_bond_readout.atom_ffn_base.parameters())[
                             0 : 2 * args.frzn_ffn_layers
                         ]:
                             param.requires_grad = False
-                        for param in list(self.readout.bond_ffn_base.parameters())[
+                        for param in list(self.atom_bond_readout.bond_ffn_base.parameters())[
                             0 : 2 * args.frzn_ffn_layers
                         ]:
                             param.requires_grad = False
                     else:
-                        for ffn in self.readout.ffn_list:
+                        for ffn in self.atom_bond_readout.ffn_list:
                             if ffn.constraint:
                                 for param in list(ffn.ffn.parameters())[
                                     0 : 2 * args.frzn_ffn_layers
                                 ]:
                                     param.requires_grad = False
                             else:
-                                for param in list(ffn.ffn_readout.parameters())[
+                                for param in list(ffn.atom_bond_readout.parameters())[
                                     0 : 2 * args.frzn_ffn_layers
                                 ]:
                                     param.requires_grad = False
+                    for param in list(self.molecule_readout.parameters())[
+                        0 : 2 * args.frzn_ffn_layers
+                    ]:  # Freeze weights and bias for given number of layers
+                        param.requires_grad = False
                 else:
                     for param in list(self.readout.parameters())[
                         0 : 2 * args.frzn_ffn_layers
@@ -265,7 +279,7 @@ class MoleculeModel(nn.Module):
         :return: The output of the :class:`MoleculeModel`, containing a list of property predictions.
         """
         if self.is_atom_bond_targets:
-            encodings = self.encoder(
+            atom_hiddens, a_scope, bond_hiddens, b_scope, b2br, mol_vecs = self.encoder(
                 batch,
                 features_batch,
                 atom_descriptors_batch,
@@ -273,7 +287,8 @@ class MoleculeModel(nn.Module):
                 bond_descriptors_batch,
                 bond_features_batch,
             )
-            output = self.readout(encodings, constraints_batch, bond_types_batch)
+            atom_bond_output = self.atom_bond_readout((atom_hiddens, a_scope, bond_hiddens, b_scope, b2br), constraints_batch, bond_types_batch)
+            molecule_output = self.molecule_readout((mol_vecs))
         else:
             encodings = self.encoder(
                 batch,
@@ -353,4 +368,4 @@ class MoleculeModel(nn.Module):
             else:
                 output = nn.functional.softplus(output) + 1
 
-        return output
+        return atom_bond_output, molecule_output

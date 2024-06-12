@@ -46,29 +46,31 @@ def train(
 
     model.train()
     if model.is_atom_bond_targets:
-        loss_sum, iter_count = [0]*(len(args.atom_targets) + len(args.bond_targets)), 0
+        atom_bond_loss_sum, iter_count = [0]*(len(args.atom_targets) + len(args.bond_targets)), 0
+        molecule_loss_sum = 0
     else:
         loss_sum = iter_count = 0
 
     for batch in tqdm(data_loader, total=len(data_loader), leave=False):
         # Prepare batch
         batch: MoleculeDataset
-        mol_batch, features_batch, target_batch, mask_batch, atom_descriptors_batch, atom_features_batch, bond_descriptors_batch, bond_features_batch, constraints_batch, data_weights_batch = \
-            batch.batch_graph(), batch.features(), batch.targets(), batch.mask(), batch.atom_descriptors(), \
+        mol_batch, features_batch, target_batch, atom_bond_target_batch, molecule_target_batch, mask_batch, atom_bond_mask_batch, molecule_mask_batch, atom_descriptors_batch, atom_features_batch, bond_descriptors_batch, bond_features_batch, constraints_batch, data_weights_batch = \
+            batch.batch_graph(), batch.features(), batch.targets(), batch.atom_bond_targets(), batch.molecule_targets(), batch.mask(), batch.atom_bond_mask(), batch.molecule_mask(), batch.atom_descriptors(), \
             batch.atom_features(), batch.bond_descriptors(), batch.bond_features(), batch.constraints(), batch.data_weights()
 
         if model.is_atom_bond_targets:
-            targets = []
-            for dt in zip(*target_batch):
+            # atom and bond
+            atom_bond_targets = []
+            for dt in zip(*atom_bond_target_batch):
                 dt = np.concatenate(dt)
-                targets.append(torch.tensor([0 if x is None else x for x in dt], dtype=torch.float))
-            masks = [torch.tensor(mask, dtype=torch.bool) for mask in mask_batch]
+                atom_bond_targets.append(torch.tensor([0 if x is None else x for x in dt], dtype=torch.float))
+            atom_bond_masks = [torch.tensor(mask, dtype=torch.bool) for mask in atom_bond_mask_batch]
             if args.target_weights is not None:
-                target_weights = [torch.ones(1, 1) * i for i in args.target_weights]  # shape(tasks, 1)
+                atom_bond_target_weights = [torch.ones(1, 1) * i for i in args.target_weights]  # shape(tasks, 1)
             else:
-                target_weights = [torch.ones(1, 1) for i in targets]
-            data_weights = batch.atom_bond_data_weights()
-            data_weights = [torch.tensor(x).unsqueeze(1) for x in data_weights]
+                atom_bond_target_weights = [torch.ones(1, 1) for i in atom_bond_targets]
+            atom_bond_data_weights = batch.atom_bond_data_weights()
+            atom_bond_data_weights = [torch.tensor(x).unsqueeze(1) for x in atom_bond_data_weights]
 
             natoms, nbonds = batch.number_of_atoms, batch.number_of_bonds
             natoms, nbonds = np.array(natoms).flatten(), np.array(nbonds).flatten()
@@ -103,6 +105,16 @@ def train(
                     bond_types_batch.append(bond_types)
                 else:
                     bond_types_batch.append(None)
+            # molecule
+            molecule_mask_batch = np.transpose(molecule_mask_batch).tolist()
+            molecule_masks = torch.tensor(molecule_mask_batch, dtype=torch.bool)  # shape(batch, tasks)
+            molecule_targets = torch.tensor([[0 if x is None else x for x in tb] for tb in molecule_target_batch])  # shape(batch, tasks)
+
+            if args.target_weights is not None:
+                target_weights = torch.tensor(args.target_weights).unsqueeze(0)  # shape(1,tasks)
+            else:
+                molecule_target_weights = torch.ones(molecule_targets.shape[1]).unsqueeze(0)
+            molecule_data_weights = torch.tensor(data_weights_batch).unsqueeze(1)  # shape(batch,1)
         else:
             mask_batch = np.transpose(mask_batch).tolist()
             masks = torch.tensor(mask_batch, dtype=torch.bool)  # shape(batch, tasks)
@@ -125,7 +137,7 @@ def train(
 
         # Run model
         model.zero_grad()
-        preds = model(
+        atom_bond_preds, molecule_preds = model(
             mol_batch,
             features_batch,
             atom_descriptors_batch,
@@ -139,12 +151,18 @@ def train(
         # Move tensors to correct device
         torch_device = args.device
         if model.is_atom_bond_targets:
-            masks = [x.to(torch_device) for x in masks]
-            masks = [x.reshape([-1, 1]) for x in masks]
-            targets = [x.to(torch_device) for x in targets]
-            targets = [x.reshape([-1, 1]) for x in targets]
-            target_weights = [x.to(torch_device) for x in target_weights]
-            data_weights = [x.to(torch_device) for x in data_weights]
+            # atom and bond
+            atom_bond_masks = [x.to(torch_device) for x in atom_bond_masks]
+            atom_bond_masks = [x.reshape([-1, 1]) for x in atom_bond_masks]
+            atom_bond_targets = [x.to(torch_device) for x in atom_bond_targets]
+            atom_bond_targets = [x.reshape([-1, 1]) for x in atom_bond_targets]
+            atom_bond_target_weights = [x.to(torch_device) for x in atom_bond_target_weights]
+            atom_bond_data_weights = [x.to(torch_device) for x in atom_bond_data_weights]
+            # molecule
+            molecule_masks = molecule_masks.to(torch_device)
+            molecule_targets = molecule_targets.to(torch_device)
+            molecule_target_weights = molecule_target_weights.to(torch_device)
+            molecule_data_weights = molecule_data_weights.to(torch_device)
         else:
             masks = masks.to(torch_device)
             targets = targets.to(torch_device)
@@ -157,13 +175,15 @@ def train(
         # Calculate losses
         if model.is_atom_bond_targets:
             loss_multi_task = []
-            for target, pred, target_weight, data_weight, mask in zip(targets, preds, target_weights, data_weights, masks):
+            for atom_bond_target, atom_bond_pred, atom_bond_target_weight, atom_bond_data_weight, atom_bond_mask in \
+                zip(atom_bond_targets, atom_bond_preds, atom_bond_target_weights, atom_bond_data_weights, atom_bond_masks):
                 if args.loss_function == "mcc" and args.dataset_type == "classification":
                     loss = loss_func(pred, target, data_weight, mask) * target_weight.squeeze(0)
                 elif args.loss_function == "bounded_mse":
                     raise ValueError(f'Loss function "{args.loss_function}" is not supported with dataset type {args.dataset_type} in atomic/bond properties prediction.')
                 elif args.loss_function in ["binary_cross_entropy", "mse", "mve"]:
-                    loss = loss_func(pred, target) * target_weight * data_weight * mask
+                    #loss = loss_func(pred, target) * target_weight * data_weight * mask
+                    atom_bond_loss = loss_func(atom_bond_pred, atom_bond_target) * atom_bond_target_weight * atom_bond_data_weight * atom_bond_mask
                 elif args.loss_function == "evidential":
                     loss = loss_func(pred, target, args.evidential_regularization) * target_weight * data_weight * mask
                 elif args.loss_function == "dirichlet" and args.dataset_type == "classification":
@@ -173,13 +193,30 @@ def train(
                     loss = loss_func(pred, target, quantiles_tensor) * target_weight * data_weight * mask
                 else:
                     raise ValueError(f'Dataset type "{args.dataset_type}" is not supported.')
-                loss = loss.sum() / mask.sum()
-                loss_multi_task.append(loss)
+                atom_bond_loss = atom_bond_loss.sum() / atom_bond_mask.sum()
+                loss_multi_task.append(atom_bond_loss)
 
-            loss_sum = [x + y for x, y in zip(loss_sum, loss_multi_task)]
+            for molecule_target, molecule_pred, molecule_target_weight, molecule_data_weight, molecule_mask in \
+                zip(molecule_targets, molecule_preds, molecule_target_weights, molecule_data_weights, molecule_masks):
+                if args.loss_function == "mcc" and args.dataset_type == "classification":
+                    loss = loss_func(pred, target, data_weight, mask) * target_weight.squeeze(0)
+                elif args.loss_function == "bounded_mse":
+                    raise ValueError(f'Loss function "{args.loss_function}" is not supported with dataset type {args.dataset_type} in atomic/bond properties prediction.')
+                elif args.loss_function in ["binary_cross_entropy", "mse", "mve"]:
+                    molecule_loss = loss_func(molecule_pred, molecule_target) * molecule_target_weight * molecule_data_weight * molecule_mask
+                elif args.loss_function == "evidential":
+                    loss = loss_func(pred, target, args.evidential_regularization) * target_weight * data_weight * mask
+                elif args.loss_function == "dirichlet" and args.dataset_type == "classification":
+                    loss = loss_func(pred, target, args.evidential_regularization) * target_weight * data_weight * mask
+                elif args.loss_function == "quantile_interval":
+                    quantiles_tensor = torch.tensor(args.quantiles, device=torch_device)
+                    loss = loss_func(pred, target, quantiles_tensor) * target_weight * data_weight * mask
+                else:
+                    raise ValueError(f'Dataset type "{args.dataset_type}" is not supported.')
+            atom_bond_loss_sum = [x + y for x, y in zip(atom_bond_loss_sum, loss_multi_task)]
+            loss = sum(loss_multi_task) + sum(molecule_loss) / (len(loss_multi_task) + len(molecule_loss))
             iter_count += 1
-
-            sum(loss_multi_task).backward()
+            loss.backward()
         else:
             if args.loss_function == "mcc" and args.dataset_type == "classification":
                 loss = loss_func(preds, targets, data_weights, masks) * target_weights.squeeze(0)
@@ -233,26 +270,26 @@ def train(
 
         n_iter += len(batch)
 
-        # Log and/or add to tensorboard
-        if (n_iter // args.batch_size) % args.log_frequency == 0:
-            lrs = scheduler.get_lr()
-            pnorm = compute_pnorm(model)
-            gnorm = compute_gnorm(model)
-            if model.is_atom_bond_targets:
-                loss_avg = sum(loss_sum) / iter_count
-                loss_sum, iter_count = [0]*(len(args.atom_targets) + len(args.bond_targets)), 0
-            else:
-                loss_avg = loss_sum / iter_count
-                loss_sum = iter_count = 0
+        # # Log and/or add to tensorboard
+        # if (n_iter // args.batch_size) % args.log_frequency == 0:
+        #     lrs = scheduler.get_lr()
+        #     pnorm = compute_pnorm(model)
+        #     gnorm = compute_gnorm(model)
+        #     if model.is_atom_bond_targets:
+        #         loss_avg = sum(loss_sum) / iter_count
+        #         loss_sum, iter_count = [0]*(len(args.atom_targets) + len(args.bond_targets)), 0
+        #     else:
+        #         loss_avg = loss_sum / iter_count
+        #         loss_sum = iter_count = 0
 
-            lrs_str = ", ".join(f"lr_{i} = {lr:.4e}" for i, lr in enumerate(lrs))
-            debug(f"Loss = {loss_avg:.4e}, PNorm = {pnorm:.4f}, GNorm = {gnorm:.4f}, {lrs_str}")
+        #     lrs_str = ", ".join(f"lr_{i} = {lr:.4e}" for i, lr in enumerate(lrs))
+        #     debug(f"Loss = {loss_avg:.4e}, PNorm = {pnorm:.4f}, GNorm = {gnorm:.4f}, {lrs_str}")
 
-            if writer is not None:
-                writer.add_scalar("train_loss", loss_avg, n_iter)
-                writer.add_scalar("param_norm", pnorm, n_iter)
-                writer.add_scalar("gradient_norm", gnorm, n_iter)
-                for i, lr in enumerate(lrs):
-                    writer.add_scalar(f"learning_rate_{i}", lr, n_iter)
+        #     if writer is not None:
+        #         writer.add_scalar("train_loss", loss_avg, n_iter)
+        #         writer.add_scalar("param_norm", pnorm, n_iter)
+        #         writer.add_scalar("gradient_norm", gnorm, n_iter)
+        #         for i, lr in enumerate(lrs):
+        #             writer.add_scalar(f"learning_rate_{i}", lr, n_iter)
 
     return n_iter

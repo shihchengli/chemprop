@@ -59,6 +59,8 @@ class MoleculeDatapoint:
                  targets: List[Optional[float]] = None,
                  atom_targets: List[Optional[float]] = None,
                  bond_targets: List[Optional[float]] = None,
+                 molecule_targets: List[Optional[float]] = None,
+                 atom_bond_targets: List[Optional[float]] = None,
                  row: OrderedDict = None,
                  data_weight: float = None,
                  gt_targets: List[List[bool]] = None,
@@ -98,6 +100,8 @@ class MoleculeDatapoint:
         self.targets = targets
         self.atom_targets = atom_targets
         self.bond_targets = bond_targets
+        self.atom_bond_targets = atom_bond_targets
+        self.molecule_targets = molecule_targets
         self.row = row
         self.features = features
         self.features_generator = features_generator
@@ -171,8 +175,8 @@ class MoleculeDatapoint:
             self.bond_features = np.where(np.isnan(self.bond_features), replace_token, self.bond_features)
 
         # Save a copy of the raw features and targets to enable different scaling later on
-        self.raw_features, self.raw_targets, self.raw_atom_targets, self.raw_bond_targets = \
-            self.features, self.targets, self.atom_targets, self.bond_targets
+        self.raw_features, self.raw_targets, self.raw_atom_targets, self.raw_bond_targets, self.raw_molecule_targets = \
+            self.features, self.targets, self.atom_targets, self.bond_targets, self.molecule_targets
         self.raw_atom_descriptors, self.raw_atom_features, self.raw_bond_descriptors, self.raw_bond_features = \
             self.atom_descriptors, self.atom_features, self.bond_descriptors, self.bond_features
 
@@ -554,6 +558,12 @@ class MoleculeDataset(Dataset):
         """
         return [d.targets for d in self._data]
     
+    def atom_bond_targets(self) -> List[List[Optional[float]]]:
+        return [d.atom_bond_targets for d in self._data]
+    
+    def molecule_targets(self) -> List[List[Optional[float]]]:
+        return [d.molecule_targets for d in self._data]
+
     def mask(self) -> List[List[bool]]:
         """
         Returns whether the targets associated with each molecule and task are present.
@@ -569,6 +579,30 @@ class MoleculeDataset(Dataset):
         else:
             mask = [[t is not None for t in dt] for dt in targets]
             mask = list(zip(*mask))
+        return mask
+
+    def atom_bond_mask(self) -> List[List[bool]]:
+        """
+        Returns whether the atom/bomd targets associated with each molecule and task are present.
+
+        :return: A list of list of booleans associated with targets.
+        """
+        targets = self.atom_bond_targets()
+        mask = []
+        for dt in zip(*targets):
+            dt = np.concatenate(dt)
+            mask.append([x is not None for x in dt])
+        return mask
+
+    def molecule_mask(self) -> List[List[bool]]:
+        """
+        Returns whether the molecular targets associated with each molecule and task are present.
+
+        :return: A list of list of booleans associated with targets.
+        """
+        targets = self.molecule_targets()
+        mask = [[t is not None for t in dt] for dt in targets]
+        mask = list(zip(*mask))
         return mask
 
     def gt_targets(self) -> List[np.ndarray]:
@@ -711,7 +745,7 @@ class MoleculeDataset(Dataset):
         This should only be used for regression datasets.
         :return: A :class:`~chemprop.data.StandardScaler` fitted to the targets.
         """
-        targets = [d.raw_targets for d in self._data]
+        targets = [d.raw_molecule_targets for d in self._data]
         scaler = StandardScaler().fit(targets)
         scaled_targets = scaler.transform(targets).tolist()
         self.set_targets(scaled_targets)
@@ -735,7 +769,7 @@ class MoleculeDataset(Dataset):
         n_bond_targets = len(bond_targets) if bond_targets is not None else 0
         n_atoms, n_bonds = self.number_of_atoms, self.number_of_bonds
 
-        targets = [d.raw_targets for d in self._data]
+        targets = [d.raw_atom_targets + d.raw_bond_targets for d in self._data]
         targets = [np.concatenate(x).reshape([-1, 1]) for x in zip(*targets)]
         scaler = AtomBondScaler(
             n_atom_targets=n_atom_targets,
@@ -925,6 +959,30 @@ class MoleculeDataLoader(DataLoader):
             raise ValueError('Cannot safely extract targets when class balance or shuffle are enabled.')
 
         return [self._dataset[index].targets for index in self._sampler]
+
+    @property
+    def atom_bond_targets(self) -> List[List[Optional[float]]]:
+        """
+        Returns the targets associated with each molecule.
+
+        :return: A list of lists of floats (or None) containing the targets.
+        """
+        if self._class_balance or self._shuffle:
+            raise ValueError('Cannot safely extract targets when class balance or shuffle are enabled.')
+
+        return [self._dataset[index].atom_bond_targets for index in self._sampler]
+
+    @property
+    def molecule_targets(self) -> List[List[Optional[float]]]:
+        """
+        Returns the targets associated with each molecule.
+
+        :return: A list of lists of floats (or None) containing the targets.
+        """
+        if self._class_balance or self._shuffle:
+            raise ValueError('Cannot safely extract targets when class balance or shuffle are enabled.')
+
+        return [self._dataset[index].molecule_targets for index in self._sampler]
 
     @property
     def gt_targets(self) -> List[List[Optional[bool]]]:

@@ -170,7 +170,7 @@ def run_training(args: TrainArgs,
     if args.dataset_type == 'regression':
         debug('Fitting scaler')
         if args.is_atom_bond_targets:
-            scaler = None
+            scaler = train_data.normalize_targets()
             atom_bond_scaler = train_data.normalize_atom_bond_targets()
         else:
             scaler = train_data.normalize_targets()
@@ -199,15 +199,16 @@ def run_training(args: TrainArgs,
     loss_func = get_loss_func(args)
 
     # Set up test set evaluation
-    test_smiles, test_targets = test_data.smiles(), test_data.targets()
+    test_smiles, test_targets, atom_bond_test_targets, molecule_test_targets = test_data.smiles(), test_data.targets(), test_data.atom_bond_targets(), test_data.molecule_targets()
     if args.dataset_type == 'multiclass':
         sum_test_preds = np.zeros((len(test_smiles), args.num_tasks, args.multiclass_num_classes))
     elif args.is_atom_bond_targets:
         sum_test_preds = []
-        for tb in zip(*test_data.targets()):
+        for tb in zip(*test_data.atom_bond_targets()):
             tb = np.concatenate(tb)
             sum_test_preds.append(np.zeros((tb.shape[0], 1)))
-        sum_test_preds = np.array(sum_test_preds, dtype=object)
+        atom_bond_sum_test_preds = np.array(sum_test_preds, dtype=object)
+        molecule_sum_test_preds = np.zeros((len(test_smiles), len(args.molecule_targets)))
     else:
         sum_test_preds = np.zeros((len(test_smiles), args.num_tasks))
 
@@ -361,28 +362,47 @@ def run_training(args: TrainArgs,
         if empty_test_set:
             info(f'Model {model_idx} provided with no test set, no metric evaluation will be performed.')
         else:
-            test_preds = predict(
+            atom_bond_test_preds, molecule_test_preds = predict(
                 model=model,
                 data_loader=test_data_loader,
                 scaler=scaler,
                 atom_bond_scaler=atom_bond_scaler
             )
-            test_scores = evaluate_predictions(
-                preds=test_preds,
-                targets=test_targets,
-                num_tasks=args.num_tasks,
+            num_atom_bond_tasks = len(args.atom_targets + args.bond_targets)
+            num_molecule_tasks = len(args.molecule_targets)
+            atom_bond_test_scores = evaluate_predictions(
+                preds=atom_bond_test_preds,
+                targets=atom_bond_test_targets,
+                num_tasks=num_atom_bond_tasks,
                 metrics=args.metrics,
                 dataset_type=args.dataset_type,
-                is_atom_bond_targets=args.is_atom_bond_targets,
+                is_atom_bond_targets=True,
                 gt_targets=test_data.gt_targets(),
                 lt_targets=test_data.lt_targets(),
                 quantiles=args.quantiles,
                 logger=logger
             )
+            molecule_test_scores = evaluate_predictions(
+                preds=molecule_test_preds,
+                targets=molecule_test_targets,
+                num_tasks=num_molecule_tasks,
+                metrics=args.metrics,
+                dataset_type=args.dataset_type,
+                is_atom_bond_targets=False,
+                gt_targets=test_data.gt_targets(),
+                lt_targets=test_data.lt_targets(),
+                quantiles=args.quantiles,
+                logger=logger
+            )
+            test_scores = dict()
+            for metric in args.metrics:
+                test_scores[metric] = atom_bond_test_scores[metric] + molecule_test_scores[metric]
 
-            if len(test_preds) != 0:
+            if len(atom_bond_test_preds) != 0:
                 if args.is_atom_bond_targets:
-                    sum_test_preds += np.array(test_preds, dtype=object)
+                    #sum_test_preds += np.array(test_preds, dtype=object)
+                    atom_bond_sum_test_preds += np.array(atom_bond_test_preds, dtype=object)
+                    molecule_sum_test_preds += np.array(molecule_test_preds)
                 else:
                     sum_test_preds += np.array(test_preds)
 
@@ -405,20 +425,35 @@ def run_training(args: TrainArgs,
             metric: [np.nan for task in args.task_names] for metric in args.metrics
         }
     else:
-        avg_test_preds = (sum_test_preds / args.ensemble_size).tolist()
-
-        ensemble_scores = evaluate_predictions(
-            preds=avg_test_preds,
-            targets=test_targets,
-            num_tasks=args.num_tasks,
+        atom_bond_avg_test_preds = (atom_bond_sum_test_preds / args.ensemble_size).tolist()
+        molecule_avg_test_preds = (molecule_sum_test_preds / args.ensemble_size).tolist()
+        atom_bond_test_scores = evaluate_predictions(
+            preds=atom_bond_avg_test_preds,
+            targets=atom_bond_test_targets,
+            num_tasks=num_atom_bond_tasks,
             metrics=args.metrics,
             dataset_type=args.dataset_type,
-            is_atom_bond_targets=args.is_atom_bond_targets,
+            is_atom_bond_targets=True,
             gt_targets=test_data.gt_targets(),
             lt_targets=test_data.lt_targets(),
             quantiles=args.quantiles,
-            logger=logger,
+            logger=logger
         )
+        molecule_test_scores = evaluate_predictions(
+            preds=molecule_avg_test_preds,
+            targets=molecule_test_targets,
+            num_tasks=num_molecule_tasks,
+            metrics=args.metrics,
+            dataset_type=args.dataset_type,
+            is_atom_bond_targets=False,
+            gt_targets=test_data.gt_targets(),
+            lt_targets=test_data.lt_targets(),
+            quantiles=args.quantiles,
+            logger=logger
+        )
+    ensemble_scores = dict()
+    for metric in args.metrics:
+        ensemble_scores[metric] = atom_bond_test_scores[metric] + molecule_test_scores[metric]
 
     for metric, scores in ensemble_scores.items():
         # Average ensemble score
@@ -446,13 +481,15 @@ def run_training(args: TrainArgs,
             n_atoms, n_bonds = test_data.number_of_atoms, test_data.number_of_bonds
 
             for i, atom_target in enumerate(args.atom_targets):
-                values = np.split(np.array(avg_test_preds[i]).flatten(), np.cumsum(np.array(n_atoms)))[:-1]
+                values = np.split(np.array(atom_bond_avg_test_preds[i]).flatten(), np.cumsum(np.array(n_atoms)))[:-1]
                 values = [list(v) for v in values]
                 test_preds_dataframe[atom_target] = values
             for i, bond_target in enumerate(args.bond_targets):
-                values = np.split(np.array(avg_test_preds[i+len(args.atom_targets)]).flatten(), np.cumsum(np.array(n_bonds)))[:-1]
+                values = np.split(np.array(atom_bond_avg_test_preds[i+len(args.atom_targets)]).flatten(), np.cumsum(np.array(n_bonds)))[:-1]
                 values = [list(v) for v in values]
                 test_preds_dataframe[bond_target] = values
+            for i, task_name in enumerate(args.molecule_targets):
+                test_preds_dataframe[task_name] = [pred[i] for pred in molecule_avg_test_preds]
         else:
             if args.loss_function == "quantile_interval" and metric == "quantile":
                 num_tasks = len(args.task_names) // 2

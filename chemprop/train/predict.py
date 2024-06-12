@@ -41,7 +41,7 @@ def predict(
 
         model.apply(activate_dropout_)
 
-    preds = []
+    atom_bond_preds, molecule_preds = [], []
 
     var, lambdas, alphas, betas = [], [], [], []  # only used if returning uncertainty parameters
 
@@ -105,7 +105,7 @@ def predict(
 
         # Make predictions
         with torch.no_grad():
-            batch_preds = model(
+            atom_bond_batch_preds, molecule_batch_preds = model(
                 mol_batch,
                 features_batch,
                 atom_descriptors_batch,
@@ -117,10 +117,10 @@ def predict(
             )
 
         if model.is_atom_bond_targets:
-            batch_preds = [x.data.cpu().numpy() for x in batch_preds]
+            atom_bond_batch_preds = [x.data.cpu().numpy() for x in atom_bond_batch_preds]
             batch_vars, batch_lambdas, batch_alphas, batch_betas = [], [], [], []
 
-            for i, batch_pred in enumerate(batch_preds):
+            for i, batch_pred in enumerate(atom_bond_batch_preds):
                 if model.loss_function == "mve":
                     batch_pred, batch_var = np.split(batch_pred, 2, axis=1)
                     batch_vars.append(batch_var)
@@ -145,27 +145,26 @@ def predict(
                     batch_alphas.append(batch_alpha)
                     batch_lambdas.append(batch_lambda)
                     batch_betas.append(batch_beta)
-                batch_preds[i] = batch_pred
+                atom_bond_batch_preds[i] = batch_pred
 
             # Inverse scale for each atom/bond target if regression
             if atom_bond_scaler is not None:
-                batch_preds = atom_bond_scaler.inverse_transform(batch_preds)
+                atom_bond_batch_preds = atom_bond_scaler.inverse_transform(atom_bond_batch_preds)
                 for i, stds in enumerate(atom_bond_scaler.stds):
                     if model.loss_function == "mve":
                         batch_vars[i] = batch_vars[i] * stds ** 2
                     elif model.loss_function == "evidential":
                         batch_betas[i] = batch_betas[i] * stds ** 2
+            atom_bond_preds.append(atom_bond_batch_preds)
 
-            # Collect vectors
-            preds.append(batch_preds)
-            if model.loss_function == "mve":
-                var.append(batch_vars)
-            elif model.loss_function == "dirichlet":
-                alphas.append(batch_alphas)
-            elif model.loss_function == "evidential":  # regression
-                lambdas.append(batch_lambdas)
-                alphas.append(batch_alphas)
-                betas.append(batch_betas)
+            # molecule
+            batch_preds = molecule_batch_preds.data.cpu().numpy()
+            # Inverse scale if regression
+            if scaler is not None:
+                batch_preds = scaler.inverse_transform(batch_preds)
+            batch_preds = batch_preds.tolist()
+            molecule_preds.extend(batch_preds)
+
         else:
             batch_preds = batch_preds.data.cpu().numpy()
 
@@ -211,11 +210,14 @@ def predict(
                 betas.extend(batch_betas.tolist())
 
     if model.is_atom_bond_targets:
-        preds = [np.concatenate(x) for x in zip(*preds)]
-        var = [np.concatenate(x) for x in zip(*var)]
-        alphas = [np.concatenate(x) for x in zip(*alphas)]
-        betas = [np.concatenate(x) for x in zip(*betas)]
-        lambdas = [np.concatenate(x) for x in zip(*lambdas)]
+        atom_bond_preds = [np.concatenate(x) for x in zip(*atom_bond_preds)]
+        return atom_bond_preds, molecule_preds
+
+        # preds = [np.concatenate(x) for x in zip(*preds)]
+        # var = [np.concatenate(x) for x in zip(*var)]
+        # alphas = [np.concatenate(x) for x in zip(*alphas)]
+        # betas = [np.concatenate(x) for x in zip(*betas)]
+        # lambdas = [np.concatenate(x) for x in zip(*lambdas)]
 
     if return_unc_parameters:
         if model.loss_function == "mve":

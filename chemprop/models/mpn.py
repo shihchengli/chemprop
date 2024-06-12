@@ -170,9 +170,9 @@ class MPNEncoder(nn.Module):
             bond_hiddens = self.bond_descriptors_layer(bond_hiddens)                    # num_bonds x (hidden + descriptor size)
             bond_hiddens = self.dropout(bond_hiddens)                             # num_bonds x (hidden + descriptor size)
 
-        # Readout
-        if self.is_atom_bond_targets:
-            return atom_hiddens, a_scope, bond_hiddens, b_scope, b2br  # num_atoms x hidden, remove the first one which is zero padding
+        # # Readout
+        # if self.is_atom_bond_targets:
+        #     return atom_hiddens, a_scope, bond_hiddens, b_scope, b2br  # num_atoms x hidden, remove the first one which is zero padding
 
         mol_vecs = []
         for i, (a_start, a_size) in enumerate(a_scope):
@@ -190,6 +190,10 @@ class MPNEncoder(nn.Module):
                 mol_vecs.append(mol_vec)
 
         mol_vecs = torch.stack(mol_vecs, dim=0)  # (num_molecules, hidden_size)
+    
+        # Readout
+        if self.is_atom_bond_targets:
+            return atom_hiddens, a_scope, bond_hiddens, b_scope, b2br, mol_vecs  # num_atoms x hidden, remove the first one which is zero padding
 
         return mol_vecs  # num_molecules x hidden
 

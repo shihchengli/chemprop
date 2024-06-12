@@ -159,24 +159,38 @@ def evaluate(model: MoleculeModel,
         gt_targets = None
         lt_targets = None
 
-    preds = predict(
+    atom_bond_preds, molecule_preds = predict(
         model=model,
         data_loader=data_loader,
         scaler=scaler,
         atom_bond_scaler=atom_bond_scaler,
     )
-
-    results = evaluate_predictions(
-        preds=preds,
-        targets=data_loader.targets,
-        num_tasks=num_tasks,
+    atom_bond_results = evaluate_predictions(
+        preds=atom_bond_preds,
+        targets=data_loader.atom_bond_targets,
+        num_tasks=len(data_loader.atom_bond_targets[0]),
         metrics=metrics,
         dataset_type=dataset_type,
-        is_atom_bond_targets=model.is_atom_bond_targets,
+        is_atom_bond_targets=True,
         logger=logger,
         gt_targets=gt_targets,
         lt_targets=lt_targets,
         quantiles=quantiles,
     )
+    molecule_results = evaluate_predictions(
+        preds=molecule_preds,
+        targets=data_loader.molecule_targets,
+        num_tasks=len(data_loader.molecule_targets[0]),
+        metrics=metrics,
+        dataset_type=dataset_type,
+        is_atom_bond_targets=False,
+        logger=logger,
+        gt_targets=gt_targets,
+        lt_targets=lt_targets,
+        quantiles=quantiles,
+    )
+    results = dict()
+    for metric in metrics:
+        results[metric] = atom_bond_results[metric] + molecule_results[metric]
 
     return results

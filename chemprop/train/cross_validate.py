@@ -89,7 +89,7 @@ def cross_validate(args: TrainArgs,
         skip_none_targets=True,
         data_weights_path=args.data_weights_path
     )
-    validate_dataset_type(data, dataset_type=args.dataset_type)
+    #validate_dataset_type(data, dataset_type=args.dataset_type)
     args.features_size = data.features_size()
 
     if args.atom_descriptors == 'descriptor':
