@@ -312,6 +312,22 @@ class MoleculeDatapoint:
         """
         self.targets = targets
 
+    def set_atom_bond_targets(self, targets: List[Optional[float]]):
+        """
+        Sets the atom/bond targets of a molecule.
+
+        :param targets: A list of floats containing the targets.
+        """
+        self.atom_bond_targets = targets
+
+    def set_molecule_targets(self, targets: List[Optional[float]]):
+        """
+        Sets the molecule targets of a molecule.
+
+        :param targets: A list of floats containing the targets.
+        """
+        self.molecule_targets = targets
+
     def reset_features_and_targets(self) -> None:
         """Resets the features (atom, bond, and molecule) and targets to their raw values."""
         self.features, self.targets, self.atom_targets, self.bond_targets = \
@@ -540,7 +556,7 @@ class MoleculeDataset(Dataset):
         """
         Returns the loss weighting associated with each datapoint for atomic/bond properties prediction.
         """
-        targets = self.targets()
+        targets = self.atom_bond_targets()
         data_weights = self.data_weights()
         atom_bond_data_weights = [[] for _ in targets[0]]
         for i, tb in enumerate(targets):
@@ -748,7 +764,7 @@ class MoleculeDataset(Dataset):
         targets = [d.raw_molecule_targets for d in self._data]
         scaler = StandardScaler().fit(targets)
         scaled_targets = scaler.transform(targets).tolist()
-        self.set_targets(scaled_targets)
+        self.set_molecule_targets(scaled_targets)
 
         return scaler
 
@@ -781,7 +797,7 @@ class MoleculeDataset(Dataset):
         for i in range(n_bond_targets):
             scaled_targets[i+n_atom_targets] = np.split(np.array(scaled_targets[i+n_atom_targets]).flatten(), np.cumsum(np.array(n_bonds)))[:-1]
         scaled_targets = np.array(scaled_targets, dtype=object).T
-        self.set_targets(scaled_targets)
+        self.set_atom_bond_targets(scaled_targets)
 
         return scaler
 
@@ -799,6 +815,36 @@ class MoleculeDataset(Dataset):
             )
         for i in range(len(self._data)):
             self._data[i].set_targets(targets[i])
+
+    def set_atom_bond_targets(self, targets: List[List[Optional[float]]]) -> None:
+        """
+        Sets the molecule targets for each molecule in the dataset. Assumes the targets are aligned with the datapoints.
+
+        :param targets: A list of lists of floats (or None) containing targets for each molecule. This must be the
+                        same length as the underlying dataset.
+        """
+        if not len(self._data) == len(targets):
+            raise ValueError(
+                "number of molecules and targets must be of same length! "
+                f"num molecules: {len(self._data)}, num targets: {len(targets)}"
+            )
+        for i in range(len(self._data)):
+            self._data[i].set_atom_bond_targets(targets[i])
+
+    def set_molecule_targets(self, targets: List[List[Optional[float]]]) -> None:
+        """
+        Sets the atom/bon targets for each molecule in the dataset. Assumes the targets are aligned with the datapoints.
+
+        :param targets: A list of lists of floats (or None) containing targets for each molecule. This must be the
+                        same length as the underlying dataset.
+        """
+        if not len(self._data) == len(targets):
+            raise ValueError(
+                "number of molecules and targets must be of same length! "
+                f"num molecules: {len(self._data)}, num targets: {len(targets)}"
+            )
+        for i in range(len(self._data)):
+            self._data[i].set_molecule_targets(targets[i])
 
     def reset_features_and_targets(self) -> None:
         """Resets the features (atom, bond, and molecule) and targets to their raw values."""

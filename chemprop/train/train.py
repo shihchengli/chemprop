@@ -54,8 +54,8 @@ def train(
     for batch in tqdm(data_loader, total=len(data_loader), leave=False):
         # Prepare batch
         batch: MoleculeDataset
-        mol_batch, features_batch, target_batch, atom_bond_target_batch, molecule_target_batch, mask_batch, atom_bond_mask_batch, molecule_mask_batch, atom_descriptors_batch, atom_features_batch, bond_descriptors_batch, bond_features_batch, constraints_batch, data_weights_batch = \
-            batch.batch_graph(), batch.features(), batch.targets(), batch.atom_bond_targets(), batch.molecule_targets(), batch.mask(), batch.atom_bond_mask(), batch.molecule_mask(), batch.atom_descriptors(), \
+        mol_batch, features_batch, target_batch, atom_bond_target_batch, molecule_target_batch, atom_bond_mask_batch, molecule_mask_batch, atom_descriptors_batch, atom_features_batch, bond_descriptors_batch, bond_features_batch, constraints_batch, data_weights_batch = \
+            batch.batch_graph(), batch.features(), batch.targets(), batch.atom_bond_targets(), batch.molecule_targets(), batch.atom_bond_mask(), batch.molecule_mask(), batch.atom_descriptors(), \
             batch.atom_features(), batch.bond_descriptors(), batch.bond_features(), batch.constraints(), batch.data_weights()
 
         if model.is_atom_bond_targets:
@@ -213,10 +213,8 @@ def train(
                     loss = loss_func(pred, target, quantiles_tensor) * target_weight * data_weight * mask
                 else:
                     raise ValueError(f'Dataset type "{args.dataset_type}" is not supported.')
-            atom_bond_loss_sum = [x + y for x, y in zip(atom_bond_loss_sum, loss_multi_task)]
             loss = sum(loss_multi_task) + sum(molecule_loss) / (len(loss_multi_task) + len(molecule_loss))
             iter_count += 1
-            loss.backward()
         else:
             if args.loss_function == "mcc" and args.dataset_type == "classification":
                 loss = loss_func(preds, targets, data_weights, masks) * target_weights.squeeze(0)
