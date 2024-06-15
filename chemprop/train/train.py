@@ -215,6 +215,7 @@ def train(
                     raise ValueError(f'Dataset type "{args.dataset_type}" is not supported.')
             loss = sum(loss_multi_task) + sum(molecule_loss) / (len(loss_multi_task) + len(molecule_loss))
             iter_count += 1
+            loss.backward()
         else:
             if args.loss_function == "mcc" and args.dataset_type == "classification":
                 loss = loss_func(preds, targets, data_weights, masks) * target_weights.squeeze(0)
