@@ -5,11 +5,12 @@ from typing import List, Optional, Union, Tuple
 import numpy as np
 
 from chemprop.args import PredictArgs, TrainArgs
-from chemprop.data import get_data, get_data_from_smiles, MoleculeDataLoader, MoleculeDataset, StandardScaler
+from chemprop.data import get_data, get_data_from_smiles, MoleculeDataLoader, MoleculeDataset, StandardScaler, AtomBondScaler
 from chemprop.utils import load_args, load_checkpoint, load_scalers, makedirs, timeit, update_prediction_args
-from chemprop.features import set_extra_atom_fdim, set_extra_bond_fdim, set_reaction, set_explicit_h, set_adding_hs, reset_featurization_parameters
+from chemprop.features import set_extra_atom_fdim, set_extra_bond_fdim, set_reaction, set_explicit_h, set_adding_hs, set_keeping_atom_map, reset_featurization_parameters
 from chemprop.models import MoleculeModel
 from chemprop.uncertainty import UncertaintyCalibrator, build_uncertainty_calibrator, UncertaintyEstimator, build_uncertainty_evaluator
+from chemprop.multitask_utils import reshape_values
 
 
 def load_model(args: PredictArgs, generator: bool = False):
@@ -107,12 +108,13 @@ def set_features(args: PredictArgs, train_args: TrainArgs):
     if args.atom_descriptors == "feature":
         set_extra_atom_fdim(train_args.atom_features_size)
 
-    if args.bond_features_path is not None:
+    if args.bond_descriptors == "feature":
         set_extra_bond_fdim(train_args.bond_features_size)
 
     # set explicit H option and reaction option
     set_explicit_h(train_args.explicit_h)
     set_adding_hs(args.adding_h)
+    set_keeping_atom_map(args.keeping_atom_map)
     if train_args.reaction:
         set_reaction(train_args.reaction, train_args.reaction_mode)
     elif train_args.reaction_solvent:
@@ -129,7 +131,7 @@ def predict_and_save(
     full_data: MoleculeDataset,
     full_to_valid_indices: dict,
     models: List[MoleculeModel],
-    scalers: List[List[StandardScaler]],
+    scalers: List[Union[StandardScaler, AtomBondScaler]],
     num_models: int,
     calibrator: UncertaintyCalibrator = None,
     return_invalid_smiles: bool = False,
@@ -153,7 +155,7 @@ def predict_and_save(
     :param calibrator: A :class: `~chemprop.uncertainty.UncertaintyCalibrator` object, for use in calibrating uncertainty predictions.
     :param return_invalid_smiles: Whether to return predictions of "Invalid SMILES" for invalid SMILES, otherwise will skip them in returned predictions.
     :param save_results: Whether to save the predictions in a csv. Function returns the predictions regardless.
-    :return:  A list of lists of target predictions.
+    :return: A list of lists of target predictions.
     """
     estimator = UncertaintyEstimator(
         test_data=test_data,
@@ -165,6 +167,7 @@ def predict_and_save(
         dataset_type=args.dataset_type,
         loss_function=args.loss_function,
         uncertainty_dropout_p=args.uncertainty_dropout_p,
+        conformal_alpha=args.conformal_alpha,
         dropout_sampling_size=args.dropout_sampling_size,
         individual_ensemble_predictions=args.individual_ensemble_predictions,
         spectra_phase_mask=getattr(train_args, "spectra_phase_mask", None),
@@ -173,6 +176,12 @@ def predict_and_save(
     preds, unc = estimator.calculate_uncertainty(
         calibrator=calibrator
     )  # preds and unc are lists of shape(data,tasks)
+
+    if args.loss_function == "quantile_interval":
+        task_names = task_names[:len(task_names) // 2]
+
+    if calibrator is not None and args.is_atom_bond_targets and args.calibration_method == "isotonic":
+        unc = reshape_values(unc, test_data, len(args.atom_targets), len(args.bond_targets))
 
     if args.individual_ensemble_predictions:
         individual_preds = (
@@ -185,11 +194,12 @@ def predict_and_save(
             path=args.test_path,
             smiles_columns=args.smiles_columns,
             target_columns=task_names,
+            args=args,
             features_path=args.features_path,
             features_generator=args.features_generator,
             phase_features_path=args.phase_features_path,
             atom_descriptors_path=args.atom_descriptors_path,
-            bond_features_path=args.bond_features_path,
+            bond_descriptors_path=args.bond_descriptors_path,
             max_data_size=args.max_data_size,
             loss_function=args.loss_function,
         )
@@ -203,6 +213,7 @@ def predict_and_save(
                 dataset_type=args.dataset_type,
                 loss_function=args.loss_function,
                 calibrator=calibrator,
+                is_atom_bond_targets=args.is_atom_bond_targets,
             )
             evaluators.append(evaluator)
     else:
@@ -222,6 +233,20 @@ def predict_and_save(
     else:
         evaluations = None
 
+    if args.dataset_type == "multiclass":
+        num_tasks = num_tasks * args.multiclass_num_classes
+
+    if args.uncertainty_method == "spectra_roundrobin":
+        num_unc_tasks = 1
+    elif args.uncertainty_method == "dirichlet" and args.dataset_type == "multiclass":
+        num_unc_tasks = num_tasks // args.multiclass_num_classes # dirichlet only returns an uncertainty for each task rather than each class
+    elif args.calibration_method == "conformal_regression":
+        num_unc_tasks = 2 * num_tasks
+    elif args.calibration_method == "conformal" and args.dataset_type == "classification":
+        num_unc_tasks = 2 * num_tasks
+    else:
+        num_unc_tasks = num_tasks
+
     # Save results
     if save_results:
         print(f"Saving predictions to {args.preds_path}")
@@ -238,11 +263,6 @@ def predict_and_save(
                 for name in task_names
                 for i in range(args.multiclass_num_classes)
             ]
-            num_tasks = num_tasks * args.multiclass_num_classes
-        if args.uncertainty_method == "spectra_roundrobin":
-            num_unc_tasks = 1
-        else:
-            num_unc_tasks = num_tasks
 
         # Copy predictions over to full_data
         for full_index, datapoint in enumerate(full_data):
@@ -278,14 +298,25 @@ def predict_and_save(
             # Add predictions columns
             if args.uncertainty_method == "spectra_roundrobin":
                 unc_names = [estimator.label]
+            elif args.uncertainty_method == "conformal_quantile_regression" and args.calibration_method is None:
+                unc_names = [f"{name}_{args.conformal_alpha}_half_interval" for name in task_names]
+            elif args.calibration_method == "conformal_regression" and args.calibration_path is None:
+                unc_names = []
+            elif args.calibration_method == "conformal" and args.dataset_type == "classification":
+                unc_names = [f"{name}_{estimator.label}_in_set" for name in task_names] + [
+                    f"{name}_{estimator.label}_out_set" for name in task_names
+                ]
             else:
                 unc_names = [name + f"_{estimator.label}" for name in task_names]
-
-            for pred_name, unc_name, pred, un in zip(
-                task_names, unc_names, d_preds, d_unc
-            ):
+            
+            for pred_name, pred in zip(task_names, d_preds):
                 datapoint.row[pred_name] = pred
-                if args.uncertainty_method is not None:
+            
+
+            for unc_name, un in zip(unc_names, d_unc):
+                if (
+                    args.uncertainty_method is not None or args.calibration_method is not None
+                ):
                     datapoint.row[unc_name] = un
             if args.individual_ensemble_predictions:
                 for pred_name, model_preds in zip(task_names, ind_preds):
@@ -293,9 +324,10 @@ def predict_and_save(
                         datapoint.row[pred_name + f"_model_{idx}"] = pred
 
         # Save
-        with open(args.preds_path, "w") as f:
+        with open(args.preds_path, 'w', newline="") as f:
             writer = csv.DictWriter(f, fieldnames=full_data[0].row.keys())
             writer.writeheader()
+
             for datapoint in full_data:
                 writer.writerow(datapoint.row)
 
@@ -303,7 +335,7 @@ def predict_and_save(
             print(f"Saving uncertainty evaluations to {args.evaluation_scores_path}")
             if args.dataset_type == "multiclass":
                 task_names = original_task_names
-            with open(args.evaluation_scores_path, "w") as f:
+            with open(args.evaluation_scores_path, "w", newline="") as f:
                 writer = csv.writer(f)
                 writer.writerow(["evaluation_method"] + task_names)
                 for i, evaluation_method in enumerate(args.evaluation_methods):
@@ -335,7 +367,7 @@ def make_predictions(
         PredictArgs,
         TrainArgs,
         List[MoleculeModel],
-        List[StandardScaler],
+        List[Union[StandardScaler, AtomBondScaler]],
         int,
         List[str],
     ] = None,
@@ -365,39 +397,49 @@ def make_predictions(
     :return: A list of lists of target predictions. If returning uncertainty, a tuple containing first prediction values then uncertainty estimates.
     """
     if model_objects:
-        (
-            args,
-            train_args,
-            models,
-            scalers,
-            num_tasks,
-            task_names,
-        ) = model_objects
+        (args, train_args, models, scalers, num_tasks, task_names) = model_objects
     else:
-        (
-            args,
-            train_args,
-            models,
-            scalers,
-            num_tasks,
-            task_names,
-        ) = load_model(args, generator=True)
+        (args, train_args, models, scalers, num_tasks, task_names) = load_model(
+            args, generator=True
+        )
 
     num_models = len(args.checkpoint_paths)
 
     set_features(args, train_args)
 
     # Note: to get the invalid SMILES for your data, use the get_invalid_smiles_from_file or get_invalid_smiles_from_list functions from data/utils.py
-    full_data, test_data, test_data_loader, full_to_valid_indices = load_data(
-        args, smiles
-    )
+    full_data, test_data, test_data_loader, full_to_valid_indices = load_data(args, smiles)
 
-    if args.uncertainty_method is None and (args.calibration_method is not None or args.evaluation_methods is not None):
-        if args.dataset_type in ['classification', 'multiclass']:
-            args.uncertainty_method = 'classification'
+    if args.uncertainty_method is not None and args.calibration_method in [
+        "conformal_regression",
+        "conformal_quantile_regression",
+    ]:
+        raise ValueError("Conformal regression is not compatible with an uncertainty method")
+
+    if args.uncertainty_method is None and (
+        args.calibration_method is not None or args.evaluation_methods is not None
+    ):
+        if args.dataset_type in ["classification", "multiclass"]:
+            args.uncertainty_method = "classification"
+        elif args.calibration_method == "conformal_regression":
+            if args.loss_function == "quantile_interval":
+                raise ValueError(
+                    "For a model trained on the `quantile_interval` loss function, the calibration method should be assigned as `conformal_quantile_regression` instead of `conformal_regression`."
+                    )
+            args.uncertainty_method = "conformal_regression"
+        elif args.calibration_method == "conformal_quantile_regression":
+            if args.loss_function != "quantile_interval":
+                raise ValueError(
+                    "The calibration method `conformal_quantile_regression` only supports regression models trained on the `quantile_interval` loss function."
+                    )
+            args.uncertainty_method = "conformal_quantile_regression"
         else:
-            raise ValueError('Cannot calibrate or evaluate uncertainty without selection of an uncertainty method.')
+            raise ValueError(
+                "Cannot calibrate or evaluate uncertainty without selection of an uncertainty method."
+            )
 
+    if args.calibration_method is None and args.loss_function == "quantile_interval":
+        args.uncertainty_method = "conformal_quantile_regression"
 
     if calibrator is None and args.calibration_path is not None:
 
@@ -405,11 +447,12 @@ def make_predictions(
             path=args.calibration_path,
             smiles_columns=args.smiles_columns,
             target_columns=task_names,
+            args=args,
             features_path=args.calibration_features_path,
             features_generator=args.features_generator,
             phase_features_path=args.calibration_phase_features_path,
             atom_descriptors_path=args.calibration_atom_descriptors_path,
-            bond_features_path=args.calibration_bond_features_path,
+            bond_descriptors_path=args.calibration_bond_descriptors_path,
             max_data_size=args.max_data_size,
             loss_function=args.loss_function,
         )
@@ -441,6 +484,7 @@ def make_predictions(
             dataset_type=args.dataset_type,
             loss_function=args.loss_function,
             uncertainty_dropout_p=args.uncertainty_dropout_p,
+            conformal_alpha=args.conformal_alpha,
             dropout_sampling_size=args.dropout_sampling_size,
             spectra_phase_mask=getattr(train_args, "spectra_phase_mask", None),
         )

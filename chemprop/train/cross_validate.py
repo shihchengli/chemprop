@@ -15,7 +15,7 @@ from chemprop.args import TrainArgs
 from chemprop.constants import TEST_SCORES_FILE_NAME, TRAIN_LOGGER_NAME
 from chemprop.data import get_data, get_task_names, MoleculeDataset, validate_dataset_type
 from chemprop.utils import create_logger, makedirs, timeit, multitask_mean
-from chemprop.features import set_extra_atom_fdim, set_extra_bond_fdim, set_explicit_h, set_adding_hs, set_reaction, reset_featurization_parameters
+from chemprop.features import set_extra_atom_fdim, set_extra_bond_fdim, set_explicit_h, set_adding_hs, set_keeping_atom_map, set_reaction, reset_featurization_parameters
 
 
 @timeit(logger_name=TRAIN_LOGGER_NAME)
@@ -42,8 +42,17 @@ def cross_validate(args: TrainArgs,
     # Initialize relevant variables
     init_seed = args.seed
     save_dir = args.save_dir
-    args.task_names = get_task_names(path=args.data_path, smiles_columns=args.smiles_columns,
-                                     target_columns=args.target_columns, ignore_columns=args.ignore_columns)
+    args.task_names = get_task_names(
+        path=args.data_path,
+        smiles_columns=args.smiles_columns,
+        target_columns=args.target_columns,
+        ignore_columns=args.ignore_columns,
+        loss_function=args.loss_function,
+    )
+
+    args.quantiles = [args.quantile_loss_alpha / 2] * (args.num_tasks // 2) + [1 - args.quantile_loss_alpha / 2] * (
+        args.num_tasks // 2
+    )
 
     # Print command line
     debug('Command line')
@@ -65,6 +74,7 @@ def cross_validate(args: TrainArgs,
     reset_featurization_parameters(logger=logger)
     set_explicit_h(args.explicit_h)
     set_adding_hs(args.adding_h)
+    set_keeping_atom_map(args.keeping_atom_map)
     if args.reaction:
         set_reaction(args.reaction, args.reaction_mode)
     elif args.reaction_solvent:
@@ -84,11 +94,12 @@ def cross_validate(args: TrainArgs,
 
     if args.atom_descriptors == 'descriptor':
         args.atom_descriptors_size = data.atom_descriptors_size()
-        args.ffn_hidden_size += args.atom_descriptors_size
     elif args.atom_descriptors == 'feature':
         args.atom_features_size = data.atom_features_size()
         set_extra_atom_fdim(args.atom_features_size)
-    if args.bond_features_path is not None:
+    if args.bond_descriptors == 'descriptor':
+        args.bond_descriptors_size = data.bond_descriptors_size()
+    elif args.bond_descriptors == 'feature':
         args.bond_features_size = data.bond_features_size()
         set_extra_bond_fdim(args.bond_features_size)
 
@@ -131,22 +142,36 @@ def cross_validate(args: TrainArgs,
     contains_nan_scores = False
     for fold_num in range(args.num_folds):
         for metric, scores in all_scores.items():
-            info(f'\tSeed {init_seed + fold_num} ==> test {metric} = {multitask_mean(scores[fold_num], metric):.6f}')
+            info(f'\tSeed {init_seed + fold_num} ==> test {metric} = '
+                 f'{multitask_mean(scores=scores[fold_num], metric=metric, ignore_nan_metrics=args.ignore_nan_metrics):.6f}')
 
             if args.show_individual_scores:
-                for task_name, score in zip(args.task_names, scores[fold_num]):
+                if args.loss_function == "quantile_interval" and metric == "quantile":
+                    num_tasks = len(args.task_names) // 2
+                    task_names = args.task_names[:num_tasks]
+                    task_names = [f"{task_name} lower" for task_name in task_names] + [
+                                  f"{task_name} upper" for task_name in task_names]
+                else:
+                    task_names = args.task_names
+
+                for task_name, score in zip(task_names, scores[fold_num]):
                     info(f'\t\tSeed {init_seed + fold_num} ==> test {task_name} {metric} = {score:.6f}')
                     if np.isnan(score):
                         contains_nan_scores = True
 
     # Report scores across folds
     for metric, scores in all_scores.items():
-        avg_scores = multitask_mean(scores, axis=1, metric=metric)  # average score for each model across tasks
+        avg_scores = multitask_mean(
+            scores=scores,
+            axis=1,
+            metric=metric,
+            ignore_nan_metrics=args.ignore_nan_metrics
+        )  # average score for each model across tasks
         mean_score, std_score = np.mean(avg_scores), np.std(avg_scores)
         info(f'Overall test {metric} = {mean_score:.6f} +/- {std_score:.6f}')
 
         if args.show_individual_scores:
-            for task_num, task_name in enumerate(args.task_names):
+            for task_num, task_name in enumerate(task_names):
                 info(f'\tOverall test {task_name} {metric} = '
                      f'{np.mean(scores[:, task_num]):.6f} +/- {np.std(scores[:, task_num]):.6f}')
 
@@ -177,7 +202,15 @@ def cross_validate(args: TrainArgs,
                 row += [mean, std] + task_scores.tolist()
             writer.writerow(row)
         else: # all other data types, separate scores by task
-            for task_num, task_name in enumerate(args.task_names):
+            if args.loss_function == "quantile_interval" and metric == "quantile":
+                num_tasks = len(args.task_names) // 2
+                task_names = args.task_names[:num_tasks]
+                task_names = [f"{task_name} (lower quantile)" for task_name in task_names] + [
+                                f"{task_name} (upper quantile)" for task_name in task_names]
+            else:
+                task_names = args.task_names
+
+            for task_num, task_name in enumerate(task_names):
                 row = [task_name]
                 for metric, scores in all_scores.items():
                     task_scores = scores[:, task_num]
@@ -186,13 +219,17 @@ def cross_validate(args: TrainArgs,
                 writer.writerow(row)
 
     # Determine mean and std score of main metric
-    avg_scores = multitask_mean(all_scores[args.metric], metric=args.metric, axis=1)
+    avg_scores = multitask_mean(
+        scores=all_scores[args.metric],
+        metric=args.metric, axis=1,
+        ignore_nan_metrics=args.ignore_nan_metrics
+    )
     mean_score, std_score = np.mean(avg_scores), np.std(avg_scores)
 
     # Optionally merge and save test preds
     if args.save_preds:
         all_preds = pd.concat([pd.read_csv(os.path.join(save_dir, f'fold_{fold_num}', 'test_preds.csv'))
-                               for fold_num in range(args.num_folds)])
+                                  for fold_num in range(args.num_folds)])
         all_preds.to_csv(os.path.join(save_dir, 'test_preds.csv'), index=False)
 
     return mean_score, std_score

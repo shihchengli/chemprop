@@ -1,3 +1,4 @@
+import numpy as np
 from typing import Iterator, List
 
 from chemprop.data import MoleculeDataset, StandardScaler
@@ -19,6 +20,7 @@ class UncertaintyEstimator:
         dataset_type: str,
         loss_function: str,
         uncertainty_dropout_p: float,
+        conformal_alpha: float,
         dropout_sampling_size: int,
         individual_ensemble_predictions: bool,
         spectra_phase_mask: List[List[bool]],
@@ -35,6 +37,7 @@ class UncertaintyEstimator:
             dataset_type=dataset_type,
             loss_function=loss_function,
             uncertainty_dropout_p=uncertainty_dropout_p,
+            conformal_alpha=conformal_alpha,
             dropout_sampling_size=dropout_sampling_size,
             individual_ensemble_predictions=individual_ensemble_predictions,
             spectra_phase_mask=spectra_phase_mask,
@@ -49,9 +52,7 @@ class UncertaintyEstimator:
 
         if calibrator is not None:
             self.label = calibrator.label
-            cal_preds, cal_unc = calibrator.apply_calibration(
-                uncal_predictor=self.predictor
-            )
+            cal_preds, cal_unc = calibrator.apply_calibration(uncal_predictor=self.predictor)
             return cal_preds, cal_unc
         else:
             uncal_preds = self.predictor.get_uncal_preds()
@@ -62,4 +63,4 @@ class UncertaintyEstimator:
         """
         Return separate predictions made by each individual model in an ensemble of models.
         """
-        return self.predictor.get_individual_preds()
+        return np.asarray(self.predictor.get_individual_preds())

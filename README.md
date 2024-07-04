@@ -1,32 +1,45 @@
-![ChemProp Logo](docs/source/_static/images/chemprop_logo.svg)
-# Molecular Property Prediction
+![ChemProp Logo](logo/chemprop_logo.svg)
+# Chemprop
 
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/chemprop)](https://badge.fury.io/py/chemprop)
 [![PyPI version](https://badge.fury.io/py/chemprop.svg)](https://badge.fury.io/py/chemprop)
-[![Build Status](https://github.com/chemprop/chemprop/workflows/tests/badge.svg)](https://github.com/chemprop/chemprop)
+[![Anaconda-Server Badge](https://anaconda.org/conda-forge/chemprop/badges/version.svg)](https://anaconda.org/conda-forge/chemprop)
+[![Build Status](https://github.com/chemprop/chemprop/workflows/tests/badge.svg)](https://github.com/chemprop/chemprop/actions/workflows/tests.yml)
+[![Documentation Status](https://readthedocs.org/projects/chemprop/badge/?version=latest)](https://chemprop.readthedocs.io/en/latest/?badge=latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Downloads](https://static.pepy.tech/badge/chemprop)](https://pepy.tech/project/chemprop)
+[![Downloads](https://static.pepy.tech/badge/chemprop/month)](https://pepy.tech/project/chemprop)
+[![Downloads](https://static.pepy.tech/badge/chemprop/week)](https://pepy.tech/project/chemprop)
 
-This repository contains message passing neural networks for molecular property prediction as described in the paper [Analyzing Learned Molecular Representations for Property Prediction](https://pubs.acs.org/doi/abs/10.1021/acs.jcim.9b00237) and as used in the paper [A Deep Learning Approach to Antibiotic Discovery](https://www.cell.com/cell/fulltext/S0092-8674(20)30102-1) for molecules and [Machine Learning of Reaction Properties via Learned Representations of the Condensed Graph of Reaction](https://doi.org/10.1021/acs.jcim.1c00975) for reactions.
+Chemprop is a repository containing message passing neural networks for molecular property prediction.
 
-**Documentation:** Full documentation of Chemprop is available at https://chemprop.readthedocs.io/en/latest/.
+**License:** Chemprop is free to use under the [MIT License](LICENSE.txt). The Chemprop logo is free to use under [CC0 1.0](logo/LICENSE.txt).
 
-**Website:** A web prediction interface with some trained Chemprop models is available at [chemprop.csail.mit.edu](http://chemprop.csail.mit.edu).
+**References**: Please cite the appropriate papers if Chemprop is helpful to your research.
 
-**Tutorial:** These [slides](https://docs.google.com/presentation/d/14pbd9LTXzfPSJHyXYkfLxnK8Q80LhVnjImg8a3WqCRM/edit?usp=sharing) provide a Chemprop tutorial and highlight recent additions as of April 28th, 2020.
+- Chemprop was initially described in the papers [Analyzing Learned Molecular Representations for Property Prediction](https://pubs.acs.org/doi/abs/10.1021/acs.jcim.9b00237) for molecules and [Machine Learning of Reaction Properties via Learned Representations of the Condensed Graph of Reaction](https://doi.org/10.1021/acs.jcim.1c00975) for reactions.
+- The interpretation functionality is based on the paper [Multi-Objective Molecule Generation using Interpretable Substructures](https://arxiv.org/abs/2002.03244).
+- Chemprop now has its own dedicated manuscript that describes and benchmarks it in more detail: [Chemprop: A Machine Learning Package for Chemical Property Prediction](https://doi.org/10.1021/acs.jcim.3c01250).
 
-## COVID-19 Update
+**Selected Applications**: Chemprop has been successfully used in the following works.
 
-Please see [aicures.mit.edu](https://aicures.mit.edu) and the associated [data GitHub repo](https://github.com/yangkevin2/coronavirus_data) for information about our recent efforts to use Chemprop to identify drug candidates for treating COVID-19.
+- [A Deep Learning Approach to Antibiotic Discovery](https://www.cell.com/cell/fulltext/S0092-8674(20)30102-1) - _Cell_ (2020): Chemprop was used to predict antibiotic activity against _E. coli_, leading to the discovery of [Halicin](https://en.wikipedia.org/wiki/Halicin), a novel antibiotic candidate. Model checkpoints are availabile on [Zenodo](https://doi.org/10.5281/zenodo.6527882).
+- [Discovery of a structural class of antibiotics with explainable deep learning](https://www.nature.com/articles/s41586-023-06887-8) - _Nature_ (2023): Identified a structural class of antibiotics selective against methicillin-resistant _S. aureus_ (MRSA) and vancomycin-resistant enterococci using ensembles of Chemprop models, and explained results using Chemprop's interpret method.
+- [ADMET-AI: A machine learning ADMET platform for evaluation of large-scale chemical libraries](https://www.biorxiv.org/content/10.1101/2023.12.28.573531v1): Chemprop was trained on 41 absorption, distribution, metabolism, excretion, and toxicity (ADMET) datasets from the [Therapeutics Data Commons](https://tdcommons.ai). The Chemprop models in ADMET-AI are available both as a web server at [admet.ai.greenstonebio.com](https://admet.ai.greenstonebio.com) and as a Python package at [github.com/swansonk14/admet_ai](https://github.com/swansonk14/admet_ai). 
+- A more extensive list of successful Chemprop applications is given in our [2023 paper](https://doi.org/10.1021/acs.jcim.3c01250)
 
 ## Table of Contents
 
+- [Documentation](#documentation)
+- [Tutorials and Examples](#tutorials-and-examples)
 - [Requirements](#requirements)
 - [Installation](#installation)
   * [Option 1: Installing from PyPi](#option-1-installing-from-pypi)
   * [Option 2: Installing from source](#option-2-installing-from-source)
   * [Docker](#docker)
+- [Known Issues](#known-issues)
 - [Web Interface](#web-interface)
 - [Within Python](#within-python)
-- [Reproducibility](#reproducibility)
 - [Data](#data)
 - [Training](#training)
   * [Train/Validation/Test Splits](#trainvalidationtest-splits)
@@ -41,6 +54,7 @@ Please see [aicures.mit.edu](https://aicures.mit.edu) and the associated [data G
   * [Spectra](#spectra)
   * [Reaction](#reaction)
   * [Reaction in a solvent / Reaction and a molecule](#reaction-in-a-solvent--reaction-and-a-molecule)
+  * [Atomic and bond properties prediction](#atomic-and-bond-properties-prediction)
   * [Pretraining](#pretraining)
   * [Missing target values](#missing-target-values)
   * [Weighted training by target and data](#weighted-training-by-target-and-data)
@@ -59,6 +73,21 @@ Please see [aicures.mit.edu](https://aicures.mit.edu) and the associated [data G
 - [TensorBoard](#tensorboard)
 - [Results](#results)
 
+## Documentation
+
+* Documentation of Chemprop is available at https://chemprop.readthedocs.io/en/latest/. Note that this site is several versions behind. An up-to-date version of Read the Docs is forthcoming with the release of Chemprop v2.0.
+* This README is currently the best source for documentation on more recently-added features.
+* Please also see descriptions of all the possible command line arguments in our [`args.py`](https://github.com/chemprop/chemprop/blob/master/chemprop/args.py) file.
+
+## Tutorials and Examples
+
+* [Benchmark scripts](https://github.com/chemprop/chemprop_benchmark) - scripts from our 2023 paper, providing examples of many features using Chemprop v1.6.1
+* [ACS Fall 2023 Workshop](https://github.com/chemprop/chemprop-workshop-acs-fall2023) - presentation, interactive demo, exercises on Google Colab with solution key
+* [Google Colab notebook](https://colab.research.google.com/github/chemprop/chemprop/blob/master/colab_demo.ipynb) - several examples, intended to be run in Google Colab rather than as a Jupyter notebook on your local machine
+* [nanoHUB tool](https://nanohub.org/resources/chempropdemo/) - a notebook of examples similar to the Colab notebook above, doesn't require any installation
+  * [YouTube video](https://www.youtube.com/watch?v=TeOl5E8Wo2M) - lecture accompanying nanoHUB tool
+* These [slides](https://docs.google.com/presentation/d/14pbd9LTXzfPSJHyXYkfLxnK8Q80LhVnjImg8a3WqCRM/edit?usp=sharing) provide a Chemprop tutorial and highlight additions as of April 28th, 2020
+
 ## Requirements
 
 For small datasets (~1000 molecules), it is possible to train models within a few minutes on a standard laptop with CPUs only. However, for larger datasets and larger Chemprop models, we recommend using a GPU for significantly faster training.
@@ -73,15 +102,19 @@ Chemprop can either be installed from PyPi via pip or from source (i.e., directl
 
 Both options require conda, so first install Miniconda from [https://conda.io/miniconda.html](https://conda.io/miniconda.html).
 
-Then proceed to either option below to complete the installation. Note that on machines with GPUs, you may need to manually install a GPU-enabled version of PyTorch by following the instructions [here](https://pytorch.org/get-started/locally/).
+Then proceed to either option below to complete the installation. If installing the environment with conda seems to be taking too long, you can also try running `conda install -c conda-forge mamba` and then replacing `conda` with `mamba` in each of the steps below.
+
+**Note for machines with GPUs:** You may need to manually install a GPU-enabled version of PyTorch by following the instructions [here](https://pytorch.org/get-started/locally/). If you're encountering issues with Chemprop not using a GPU on your system after following the instructions below, check which version of PyTorch you have installed in your environment using `conda list | grep torch` or similar. If the PyTorch line includes `cpu`, please uninstall it using `conda remove pytorch` and reinstall a GPU-enabled version using the instructions at the link above.
 
 ### Option 1: Installing from PyPi
 
 1. `conda create -n chemprop python=3.8`
 2. `conda activate chemprop`
-3. `conda install -c conda-forge rdkit`
-4. `pip install git+https://github.com/bp-kelley/descriptastorus`
-5. `pip install chemprop`
+3. `pip install chemprop`
+
+> [!NOTE]  
+> Some features that were not made available in the main releases of Chemprop are instead available through 'feature releases' via PyPI: 
+> - SSL Pre-train with DDP - available in version `1.6.1.dev0`, install with `pip install chemprop==1.6.1.dev0`. Also available to be installed from source using the `sslddpv1` branch. Authored by Jiali Li, Kevin Greenman, and Shomik Verma.
 
 ### Option 2: Installing from source
 
@@ -93,7 +126,33 @@ Then proceed to either option below to complete the installation. Note that on m
 
 ### Docker
 
-Chemprop can also be installed with Docker. Docker makes it possible to isolate the Chemprop code and environment. To install and run our code in a Docker container, follow these steps:
+Chemprop can also be installed with Docker.
+Docker makes it possible to isolate the Chemprop code and environment.
+You can either pull a pre-built image or build it locally.
+
+Note that regardless of installation method you will need to run the `docker run` command with the `--gpus` command line flag to access GPUs on your machine.
+
+In addition, you will also need to ensure that the CUDA toolkit version in the Docker image is compatible with the CUDA driver on your host machine.
+Newer CUDA driver versions are backward-compatible with older CUDA toolkit versions.
+To set a specific CUDA toolkit version, add `cudatoolkit=X.Y` to `environment.yml` before building the Docker image.
+
+#### Pull Pre-Built
+
+Run this command to download and run a given release version of Chemprop:
+
+`docker run -it chemprop/chemprop:X.Y.X`
+
+where `X.Y.Z` is the version you want to download, i.e. `1.7.0`.
+
+> [!NOTE]
+> Not all versions of Chemprop are available from DockerHub - see the [DockerHub](https://hub.docker.com/r/chemprop/chemprop/tags) page for a complete list of those available.
+
+DockerHub also has a `latest` tag - this is _not_ the latest release of Chemprop, but rather the latest version of `master` which is _not necessarily fit for deployment_.
+Use this tag only for development or if you need to access a feature which has not yet been formally released!
+
+#### Local Build
+
+To install and run our code in a Docker container, follow these steps:
 
 1. `git clone https://github.com/chemprop/chemprop.git`
 2. `cd chemprop`
@@ -101,18 +160,13 @@ Chemprop can also be installed with Docker. Docker makes it possible to isolate 
 4. `docker build -t chemprop .`
 5. `docker run -it chemprop:latest`
 
-Note that you will need to run the latter command with nvidia-docker if you are on a GPU machine in order to be able to access the GPUs.
-Alternatively, with Docker 19.03+, you can specify the `--gpus` command line option instead.
+## Known Issues
 
-In addition, you will also need to ensure that the CUDA toolkit version in the Docker image is compatible with the CUDA driver on your host machine.
-Newer CUDA driver versions are backward-compatible with older CUDA toolkit versions.
-To set a specific CUDA toolkit version, add `cudatoolkit=X.Y` to `environment.yml` before building the Docker image.
+As we approach the upcoming release of Chemprop v2.0, we have closed [several issues](https://github.com/chemprop/chemprop/issues?q=label%3Av1-wontfix+) corresponding to bugs that we don't plan to fix before the final release of v1 (v1.7). We will be discontinuing support for v1 once v2 is released, but we still appreciate bug reports and will tag them as [`v1-wontfix`](https://github.com/chemprop/chemprop/issues?q=label%3Av1-wontfix+) so the community can find them easily.
 
 ## Web Interface
 
-For those less familiar with the command line, Chemprop also includes a web interface which allows for basic training and predicting. An example of the website (in demo mode with training disabled) is available here: [chemprop.csail.mit.edu](http://chemprop.csail.mit.edu/).
-
-You can start the web interface on your local machine in two ways. Flask is used for development mode while gunicorn is used for production mode.
+For those less familiar with the command line, Chemprop also includes a web interface which allows for basic training and predicting. You can start the web interface on your local machine in two ways. Flask is used for development mode while gunicorn is used for production mode.
 
 ### Flask
 
@@ -188,7 +242,7 @@ Notes:
 Our code supports several methods of splitting data into train, validation, and test sets.
 
 * **Random.** By default, the data will be split randomly into train, validation, and test sets.
-* **Scaffold.** Alternatively, the data can be split by molecular scaffold so that the same scaffold never appears in more than one split. This can be specified by adding `--split_type scaffold_balanced`.
+* **Scaffold.** Alternatively, the data can be split by molecular scaffold so that the same scaffold never appears in more than one split. This can be specified by adding `--split_type scaffold_balanced`. Note that the atom-mapped numbers for atom-mapped SMILES will be removed before computing the Bemis-Murcko scaffold.
 * **k-Fold Cross-Validation.** A split type specified with `--split_type cv` intended for use when training with cross-validation. The data are split randomly into k groups of equal size, where k is the number of cross-validation folds specified with `--num_folds <k>`. Each group is used once as the test set and once as the validation set in training the k folds of the model. Alternatively, the option `--split_type cv-no-test` can be used to train without a test splits.
 * **Random With Repeated SMILES.** Some datasets have multiple entries with the same SMILES. To constrain splitting so the repeated SMILES are in the same split, use the argument `--split_type random_with_repeated_smiles`.
 * **Separate val/test.** If you have separate data files you would like to use as the validation or test set, you can specify them with `--separate_val_path <val_path>` and/or `--separate_test_path <test_path>`. If both are provided, then the data specified by `--data_path` is used entirely as the training data. If only one separate path is provided, the `--data_path` data is split between train data and either val or test data, whichever is not provided separately.
@@ -200,19 +254,21 @@ By default, both random and scaffold split the data into 80% train, 10% validati
 ### Loss functions
 
 The loss functions available for training are dependent on the selected dataset type. Loss functions other than the defaults can be selected from the supported options with the argument `--loss_function <function>`.
-* **Regression.** mse (default), bounded_mse, mve (mean-variance estimation, a.k.a. heteroscedastic loss), evidential.
+* **Regression.** mse (default), bounded_mse, mve (mean-variance estimation, a.k.a. heteroscedastic loss), evidential, quantile_interval (Pinball loss, specify margins with `--quantile_loss_alpha <float>`).
 * **Classification.** binary_cross_entropy (default), mcc (a soft version of Matthews Correlation Coefficient), dirichlet (a.k.a. evidential classification)
 * **Multiclass.** cross_entropy (default), mcc (a soft version of Matthews Correlation Coefficient)
 * **Spectra.** sid (default, spectral information divergence), wasserstein (First-order Wasserstein distance a.k.a. earthmover's distance.)
 
+
 Dropout regularization can be applied regardless of loss function using the argument `--dropout <float>` and providing a dropout fraction between 0 and 1.
 
-The regression loss functions `mve` and `evidential` function by minimizing the negative log likelihood of a predicted uncertainty distribution. If used during training, the uncertainty predictions from these loss functions can be used for uncertainty prediction during prediction tasks. A regularization specific to evidential learning can be applied using the argument `--evidential_regularization <float>`.
+The regression loss functions `mve` and `evidential` function by minimizing the negative log likelihood of a predicted uncertainty distribution. If used during training, the uncertainty predictions from these loss functions can be used for uncertainty prediction during prediction tasks. A regularization specific to evidential learning can be applied using the argument `--evidential_regularization <float>`. The regression loss function `quantile_interval` trains the model with two different output heads which correspond to the `quantile_loss_alpha/2` and `1 - quantile_loss_alpha/2` quantile predictions. Since it is a symmetrical interval, return the center of the interval as the predicted value. The evaluation metric for `quantile_interval` is automatically set to the `quantile` metric.
+
 ### Metrics
 
 Metrics are used to evaluate the success of the model against the test set as the final model score and to determine the optimal epoch to save the model at based on the validation set. The primary metric used for both purposes is selected with the argument `--metric <metric>` and additional metrics for test set score only can be added with `--extra_metrics <metric1> <metric2> ...`. Supported metrics are dependent on the dataset type. Unlike loss functions, metrics do not have to be differentiable.
-* **Regression.** rmse (default), mae, mse, r2, bounded_rmse, bounded_mae, bounded_mse (default if bounded_mse is loss function).
-* **Classification.** auc (default), prc-auc, accuracy, binary_cross_entropy, f1, mcc.
+* **Regression.** rmse (default), mae, mse, r2, bounded_rmse, bounded_mae, bounded_mse (default if bounded_mse is loss function), quantile (average of pinball loss for both output heads).
+* **Classification.** auc (default), prc-auc, accuracy, binary_cross_entropy, f1, mcc, recall, precision and balanced accuracy.
 * **Multiclass.** cross_entropy (default), accuracy, f1, mcc.
 * **Spectra.** sid (default), wasserstein.
 
@@ -221,7 +277,7 @@ When a multitask model is used, the metric score used for evaluation at each epo
 
 Cross-validation can be run by specifying `--num_folds <k>`. The default is `--num_folds 1`. Each trained model will have different train/val/test splits, determined according to the specified split type argument and split sizes argument but using a different random seed to perform the splitting. The reported test score will be the average of the metrics from each fold. To use a strict k-fold cross-validation where each datapoint will appear in fold test sets exactly once, the argument `--split_type cv` must be used.
 
-To train an ensemble, specify the number of models in the ensemble with `--ensemble_size <n>`. The default is `--ensemble_size 1`. Each trained model within the ensemble will share data splits. The reported test score for one ensemble is the metric applied to the averaged prediction across the models. Ensembling and cros-validation can be used at the same time.
+To train an ensemble, specify the number of models in the ensemble with `--ensemble_size <n>`. The default is `--ensemble_size 1`. Each trained model within the ensemble will share data splits. The reported test score for one ensemble is the metric applied to the averaged prediction across the models. Ensembling and cross-validation can be used at the same time.
 
 ### Aggregation
 
@@ -240,7 +296,7 @@ If you install from source, you can modify the code to load custom features as f
 
 #### Molecule-Level RDKit 2D Features
 
-As a starting point, we recommend using pre-normalized RDKit features by using the `--features_generator rdkit_2d_normalized --no_features_scaling` flags. In general, we recommend NOT using the `--no_features_scaling` flag (i.e. allow the code to automatically perform feature scaling), but in the case of `rdkit_2d_normalized`, those features have been pre-normalized and don't require further scaling.
+As a starting point, we recommend using pre-normalized RDKit features by using the `--features_generator rdkit_2d_normalized --no_features_scaling` flags. In general, we recommend NOT using the `--no_features_scaling` flag (i.e. allow the code to automatically perform feature scaling), but in the case of `rdkit_2d_normalized`, those features have been pre-normalized and don't require further scaling. The utilization of the `rdkit_2d_normalized` should be avoided in cases where molecule-level custom features have been loaded and necessitate additional scaling.
 
 The full list of available features for `--features_generator` is as follows. 
 
@@ -264,11 +320,11 @@ Similar to the molecule-level features, the atom-level descriptors and features 
 
 #### Bond-Level Features
 
-Bond-level features can be provided in the same format as the atom-level features, using the option `--bond_features_path /path/to/features`. The order of the features for each molecule must match the bond ordering in the RDKit molecule object. 
+Bond-level features can be provided in the same format as the atom-level features, using the option `--bond_descriptors_path /path/to/features`. The order of the features for each molecule must match the bond ordering in the RDKit molecule object.
 
-The bond-level features are concatenated with the bond feature vectors before the D-MPNN, such that they are used during message-passing. Alternatively, the user can overwrite the default bond features with the custom features using the option `--overwrite_default_bond_features`. 
+Users must select in which way bond descriptors are used. The command line option `--bond_descriptors feature` concatenates the bond-level features with the bond feature vectors before the D-MPNN, such that they are used during message-passing. For atomic/bond properties prediction, the command line option `--bond_descriptors descriptor` concatenates the new features to the embedded bond features after the D-MPNN with an additional linear layer. Alternatively, the user can overwrite the default bond features with the custom features using the option `--overwrite_default_bond_features`.
 
-Similar to molecule-, and atom-level features, the bond-level features are scaled by default. This can be disabled with the option `--no_bond_features_scaling`.
+Similar to molecule-level and atom-level features, the bond-level descriptors and features are scaled by default. This can be disabled with the option `--no_bond_descriptor_scaling`.
 
 ### Spectra
 
@@ -283,7 +339,7 @@ In absorption spectra, sometimes the phase of collection will create regions in 
 As an alternative to molecule SMILES, Chemprop can also process atom-mapped reaction SMILES (see [Daylight manual](https://www.daylight.com/meetings/summerschool01/course/basics/smirks.html) for details on reaction SMILES), which consist of three parts denoting reactants, agents and products, separated by ">". Use the option `--reaction` to enable the input of reactions, which transforms the reactants and products of each reaction to the corresponding condensed graph of reaction and changes the initial atom and bond features to hold information from both the reactant and product (option `--reaction_mode reac_prod`), or from the reactant and the difference upon reaction (option `--reaction_mode reac_diff`, default) or from the product and the difference upon reaction (option `--reaction_mode prod_diff`). In reaction mode, Chemprop thus concatenates information to each atomic and bond feature vector, for example, with option `--reaction_mode reac_prod`, each atomic feature vector holds information on the state of the atom in the reactant (similar to default Chemprop), and concatenates information on the state of the atom in the product, so that the size of the D-MPNN increases slightly. Agents are discarded. Functions incompatible with a reaction as input (scaffold splitting and feature generation) are carried out on the reactants only. If the atom-mapped reaction SMILES contain mapped hydrogens, enable explicit hydrogens via `--explicit_h`. Example of an atom-mapped reaction SMILES denoting the reaction of methanol to formaldehyde without hydrogens: `[CH3:1][OH:2]>>[CH2:1]=[O:2]` and with hydrogens: `[C:1]([H:3])([H:4])([H:5])[O:2][H:6]>>[C:1]([H:3])([H:4])=[O:2].[H:5][H:6]`. The reactions do not need to be balanced and can thus contain unmapped parts, for example leaving groups, if necessary. With reaction modes `reac_prod`, `reac_diff` and `prod_diff`, the atom and bond features of unbalanced aroma are set to zero on the side of the reaction they are not specified. Alternatively, features can be set to the same values on the reactant and product side via the modes `reac_prod_balance`, `reac_diff_balance` and `prod_diff_balance`, which corresponds to a rough balancing of the reaction.
 For further details and benchmarking, as well as a citable reference, please refer to the [article](https://doi.org/10.1021/acs.jcim.1c00975).
 
-### Reaction in a solvent / Reaction and a molecule]
+### Reaction in a solvent / Reaction and a molecule
 
 Chemprop can process a reaction in a solvent or a reaction and a molecule with the `--reaction_solvent` option. While this
 option is originally built to model a reaction in a solvent, this option works for any reaction and a molecule where 
@@ -311,6 +367,22 @@ reaction and solvent/molecule encoding. Below are the input arguments for specif
   * `--hidden_size_solvent` Dimensionality of hidden layers in solvent/molecule MPN.
   * `--depth_solvent` Number of message passing steps for solvent/molecule.
   * `--adding_h` Whether RDKit molecules will be constructed with adding the Hs to them. Applicable to any SMILES that is not reaction.
+
+### Atomic and bond properties prediction
+
+Chemprop can perform multitask constrained message passing neural networks for atomic/bond properties prediction as described in this [paper](https://chemrxiv.org/articles/preprint/Regio-Selectivity_Prediction_with_a_Machine-Learned_Reaction_Representation_and_On-the-Fly_Quantum_Mechanical_Descriptors/12907316). This model can train on any number of atomic/bond properties simultaneously. In the original work, a total loss was calculated as a weighted sum of every single loss, where the weights were required to be specified for the regression task. In this repository, these weights have been automatically taken into account by doing standardization of all the training targets. In order to train a model, training data containing molecules (as SMILES strings) and known atomic/bond target values are required, and the `--is_atom_bond_targets` flag is used. The input is a csv file. For example:
+```
+                              smiles                                  hirshfeld_charges  ...                                 bond_length_matrix                                  bond_index_matrix
+0     CNC(=S)N/N=C/c1c(O)ccc2ccccc12  [-0.026644, -0.075508, 0.096217, -0.287798, -0...  ...  [[0.0, 1.4372890960937539, 2.4525543850909814,...  [[0.0, 0.9595, 0.0158, 0.0162, 0.0103, 0.0008,...
+1      O=C(NCCn1cccc1)c1cccc2ccccc12  [-0.292411, 0.170263, -0.085754, 0.002736, 0.0...  ...  [[0.0, 1.2158509801073485, 2.2520730233154076,...  [[0.0, 1.6334, 0.1799, 0.0086, 0.0068, 0.0002,...
+2  C=C(C)[C@H]1C[C@@H]2OO[C@H]1C=C2C  [-0.101749, 0.012339, -0.07947, -0.020027, -0....  ...  [[0.0, 1.3223632546838255, 2.468055985361353, ...  [[0.0, 1.9083, 0.0179, 0.016, 0.0236, 0.001, 0...
+3                     OCCCc1cc[nH]n1  [-0.268379, 0.027614, -0.050745, -0.045047, 0....  ...  [[0.0, 1.4018301850170725, 2.4667588956616737,...  [[0.0, 0.9446, 0.0311, 0.002, 0.005, 0.0007, 0...
+4      CC(=N)NCc1cccc(CNCc2ccncc2)c1  [-0.083162, 0.114954, -0.274544, -0.100369, 0....  ...  [[0.0, 1.5137126697008916, 2.4882198180715465,...  [[0.0, 1.0036, 0.0437, 0.0108, 0.0134, 0.0004,......
+```
+where atomic properties (e.g. hirshfeld_charges) must be a 1D list with the order same as that of atoms in the SMILES string; and bond properties (e.g. bond_length_matrix) can either be a 2D list of shape (number_of_atoms × number_of_atoms) or a 1D list with the order same as that of bonds in the SMILES string. The `--keeping_atom_map` option can be used if atom-mapped SMILES is provided. The `--adding_h` option can be used if hydrogens are included in the atom targets and bonds to hydrogens are included in the bond targets.
+This model allows multitask constraints applied to different atomic/bond properties by specifying the argument `--constraints_path` with a given `.csv` file. Note that the constraints must be in the same order as the SMILES strings in your data file. Also note that `.csv` file must have a header row and the constraints should be comma-separated with one line per molecule. The optional argument `--no_shared_atom_bond_ffn` will make it so that the ffn weights used by each task are independent, otherwise the default is that atom tasks share ffn weights and bond tasks share ffn weights so that the ffn weights have the benefits of multitask training. The optional argument `--no_adding_bond_types` will let the bond types of each bond determined by RDKit molecules not be added to the output of bond targets. The optional argument `--weights_ffn_num_layers` can change the number of layers in FFN for determining weights used to correct the constrained targets.
+
+Please note that the current framework is only available for models trained on multiple atomic and bond properties simultaneously. Training on both atomic/bond and molecular targets is not supported.
 
 ### Pretraining
 
@@ -379,14 +451,24 @@ The uncertainty of predictions made in Chemprop can be estimated by several diff
 
 Uncertainty predictions may be calibrated to improve their performance on new predictions. Calibration methods are selected using `--calibration_method <method>`, options provided below. An additional dataset to use in calibration is provided through `--calibration_path <path>`, along with necessary features like `--calibration_features_path <path>`. As with the data used in training, calibration data for multitask models are allowed to have gaps and missing targets in the data.
 
-**Regression** Calibrated regression outputs can be in the form of a standard deviation or an interval, as specified with the argument `--regression_calibrator_metric <"stdev" or "interval">`. The interval can be set using `--calibration_interval_percentile <float>` in the range (1,100).
+**Regression** 
+
+Calibrated regression outputs can be in the form of a standard deviation or an interval, as specified with the argument `--regression_calibrator_metric <"stdev" or "interval">`. The interval can be set using `--calibration_interval_percentile <float>` in the range (1,100). The options mentioned above do not apply to the calibration methods `conformal_regression` and `conformal_quantile_regression`.
 * `zscaling` Assumes that errors are normally distributed according to the estimated variance for each prediction. Applies a constant multiple to all stdev or interval outputs in order to minimize the negative log likelihood for the normal distributions. (https://arxiv.org/abs/1905.11659)
 * `tscaling` Similar to zscaling. Assumes that the errors are normally distributed, but accounts for the ensemble size and uncertainty in the sample variance by using a sample-size reduced t-distribution in the negative log likelihood. Works best when errors are mostly due to variability between model instances and not dataset noise or model bias.
 * `zelikman_interval` Assumes that the error distribution is the same for each prediction but scaled by the uncalibrated standard deviation for each. Multiplies the uncalibrated standard deviation by a factor necessary to cover the specified interval of the calibration set. Does not assume a Gaussian distribution. Intended for use with intervals but can return a stdev as well. (https://arxiv.org/abs/2005.12496)
 * `mve_weighting` For use with ensembles of models trained with mve or evidential loss function. Uses a weighted average of the predicted variances to achieve a minimum negative log likelihood of predictions. (https://doi.org/10.1186/s13321-021-00551-x)
+* `conformal_regression` Generates a symmetric interval of fixed size for each prediction such that the actual value has probability $1-\alpha$ of falling in the interval. The desired error rate is controlled using the parameter `--conformal_alpha <float>` which is set by default to 0.1. (https://arxiv.org/abs/2107.07511)
+* `conformal_quantile_regression` Similar to `conformal_regression` but generates an interval of variable size for each prediction based on quantile predictions of the data. The model should be trained with parameters `--loss_function quantile_interval` and `--quantile_loss_alpha <float>` where $\alpha$ is the desired error rate of the quantile interval. The trained model will output the center of the $\alpha/2$ and $1-\alpha/2$ quantiles according to pinball loss as the predicted value and return the half range of the interval as the uncertainty quantification. The parameter `--conformal_alpha <float>` should be included to specify the desired error rate of the conformal method during inference. (https://arxiv.org/abs/2107.07511)
+
 **Classification**
 * `platt` Uses a linear scaling before the sigmoid function in prediction to minimize the negative log likelihood of the predictions. If the model checkpoint was generated after Chemprop v1.5.0, then a Bayesian correction is applied to account for the class balance in the training set during prediction. Implemented for classification but not multiclass datasets. (https://arxiv.org/abs/1706.04599)
 * `isotonic` Fits an isotonic regression model to the predictions. Prediction outputs are transformed using a stepped histogram-style to match the empirical probability observed in the calibration data. Number and size of the histogram bins are procedurally decided. Histogram bins are wider in the regions of the model output that are less reliable in ordering confidence. Implemented for both classification and multiclass datasets. (https://arxiv.org/abs/1706.04599)
+* `conformal` Generates a pair of sets of labels $C_{in} \subset C_{out}$ such that the true set of labels $S$ satisfies the property $C_{in} \subset S \subset C_{out}$ with probability at least $1-\alpha$. The desired error rate $\alpha$ can be controlled with the parameter `--conformal_alpha <float>` which is set by default to 0.1. (https://arxiv.org/abs/2004.10181)
+
+**Multiclass**
+* `conformal` Generates a set of possible classes for each prediction such that the true class has probability $1-\alpha$ of falling in the set. The desired error rate $\alpha$ can be controlled with the parameter `--conformal_alpha <float>` which is set by default to 0.1. Set generated using the basic conformal method. (https://arxiv.org/abs/2107.07511)
+* `conformal_adaptive` Generates a set of possible classes for each prediction such that the true class has probability 1-alpha of falling in the set. The desired error rate $\alpha$ can be controlled with the parameter `--conformal_alpha <float>` which is set by default to 0.1. Set generated using the adaptive conformal method. (https://arxiv.org/abs/2107.07511)
 
 ### Uncertainty Evaluation Metrics
 
@@ -397,6 +479,7 @@ The performance of uncertainty predictions (calibrated or uncalibrated) as evalu
 * `spearman` A regression evaluation metric. Returns the Spearman rank correlation between the predicted uncertainty and the actual error in predictions. Only considers ordering, does not assume a particular probability distribution.
 * `ence` Expected normalized calibration error. A regression evaluation metric. Bins model prediction according to uncertainty prediction and compares the RMSE in each bin versus the expected error based on the predicted uncertainty variance then scaled by variance. (discussed in https://doi.org/10.1021/acs.jcim.9b00975)
 * `miscalibration_area` A regression evaluation metric. Calculates the model's performance of expected probability versus realized probability at different points along the probability distribution. Values range (0, 0.5) with perfect calibration at 0. (discussed in https://doi.org/10.1021/acs.jcim.9b00975)
+* `conformal_coverage` Measures the empirical coverage of the conformal methods, that is the proportion of datapoints that fall within the output set or interval. Must be used with a conformal calibration method which outputs a set or interval. The metric can be used with multiclass, multilabel, or regression conformal methods.
 
 Different evaluation metrics consider different aspects of uncertainty. It is often appropriate to consider multiple metrics. For intance, miscalibration error is important for evaluating uncertainty magnitude but does not indicate that the uncertainty function discriminates well between different outputs. Similarly, spearman tests ordering but not prediction magnitude.
 
