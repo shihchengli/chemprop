@@ -201,12 +201,106 @@ class MultiHotAtomFeaturizer(VectorFeaturizer[Atom]):
         )
 
 
+class MultiHotAtomFeaturizer_spiekermann2024(MultiHotAtomFeaturizer):
+    """The implementation used in [spiekermann2024]_.
+
+    References
+    -----------
+    .. [spiekermann2024] Spiekermann, K.A.; Dong, X.; Menon, A.; Green, W.H.; Pfeifle, M.; Sandfort, F.; Welz, O.;
+        Bergeler, M. "Accurately Predicting Barrier Heights for Radical Reactions in Solution Using Deep Graph Networks."
+        J. Phys. Chem. A 2024, 128 (39), 8384–8403.
+    """
+
+    def __init__(
+        self,
+        atomic_nums: Sequence[int] = [1, 6, 7, 8, 16, 17],
+        degrees: Sequence[int] = list(range(6)),
+        formal_charges: Sequence[int] = [-1, -2, 1, 2, 0],
+        chiral_tags: Sequence[int] = list(range(4)),
+        num_Hs: Sequence[int] = list(range(5)),
+        num_radical_electrons: Sequence[int] = list(range(3)),
+        hybridizations: Sequence[int] = [
+            HybridizationType.SP,
+            HybridizationType.SP2,
+            HybridizationType.SP3,
+            HybridizationType.SP3D,
+            HybridizationType.SP3D2,
+        ],
+        in_ring_sizes: Sequence[int] = [3, 4, 5, 6, 7, 8],
+    ):
+        self.atomic_nums = {j: i for i, j in enumerate(atomic_nums)}
+        self.degrees = {i: i for i in degrees}
+        self.formal_charges = {j: i for i, j in enumerate(formal_charges)}
+        self.chiral_tags = {i: i for i in chiral_tags}
+        self.num_Hs = {i: i for i in num_Hs}
+        self.num_radical_electrons = {i: i for i in num_radical_electrons}
+        self.hybridizations = {ht: i for i, ht in enumerate(hybridizations)}
+        self.in_ring_sizes = {j: i for i, j in enumerate(in_ring_sizes)}
+
+        self._subfeats: list[dict] = [
+            self.atomic_nums,
+            self.degrees,
+            self.formal_charges,
+            self.chiral_tags,
+            self.num_Hs,
+            self.num_radical_electrons,
+            self.hybridizations,
+        ]
+        subfeat_sizes = [
+            1 + len(self.atomic_nums),
+            1 + len(self.degrees),
+            1 + len(self.formal_charges),
+            1 + len(self.chiral_tags),
+            1 + len(self.num_Hs),
+            1 + len(self.num_radical_electrons),
+            1 + len(self.hybridizations),
+            1,
+            1,
+            1 + len(self.in_ring_sizes),
+        ]
+        self.__size = sum(subfeat_sizes)
+
+    def __len__(self) -> int:
+        return self.__size
+
+    def __call__(self, a: Atom | None) -> np.ndarray:
+        x = np.zeros(self.__size)
+
+        if a is None:
+            return x
+
+        feats = [
+            a.GetAtomicNum(),
+            a.GetTotalDegree(),
+            a.GetFormalCharge(),
+            int(a.GetChiralTag()),
+            int(a.GetTotalNumHs()),
+            int(a.GetNumRadicalElectrons()),
+            a.GetHybridization(),
+        ]
+        i = 0
+        for feat, choices in zip(feats, self._subfeats):
+            j = choices.get(feat, len(choices))
+            x[i + j] = 1
+            i += len(choices) + 1
+        x[i] = int(a.GetIsAromatic())
+        x[i + 1] = 0.01 * a.GetMass()
+
+        x[i + 2] = a.IsInRing()
+        for j, size in enumerate(self.in_ring_sizes):
+            feat = a.IsInRingSize(size)
+            x[i + 3 + j] += [a.IsInRingSize(size)]
+
+        return x
+
+
 class AtomFeatureMode(EnumMapping):
     """The mode of an atom is used for featurization into a `MolGraph`"""
 
     V1 = auto()
     V2 = auto()
     ORGANIC = auto()
+    SPIEKERMANN2024 = auto()
 
 
 def get_multi_hot_atom_featurizer(mode: str | AtomFeatureMode) -> MultiHotAtomFeaturizer:
@@ -218,5 +312,7 @@ def get_multi_hot_atom_featurizer(mode: str | AtomFeatureMode) -> MultiHotAtomFe
             return MultiHotAtomFeaturizer.v2()
         case AtomFeatureMode.ORGANIC:
             return MultiHotAtomFeaturizer.organic()
+        case AtomFeatureMode.SPIEKERMANN2024:
+            return MultiHotAtomFeaturizer_spiekermann2024()
         case _:
             raise RuntimeError("unreachable code reached!")

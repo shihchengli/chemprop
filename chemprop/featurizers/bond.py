@@ -13,6 +13,7 @@ class MultiHotBondFeaturizer(VectorFeaturizer[Bond]):
     * bond type
     * conjugated?
     * in ring?
+    * in ring size?
     * stereochemistry
 
     The feature vectors produced by this featurizer have the following (general) signature:
@@ -26,9 +27,11 @@ class MultiHotBondFeaturizer(VectorFeaturizer[Bond]):
     +---------------------+-----------------+--------------+
     | 5-6                 | conjugated?     | N            |
     +---------------------+-----------------+--------------+
-    | 6-8                 | in ring?        | N            |
+    | 6-7                 | in ring?        | N            |
     +---------------------+-----------------+--------------+
-    | 7-14                | stereochemistry | Y            |
+    | 7-14                | in ring size?   | N            |
+    +---------------------+-----------------+--------------+
+    | 14-21               | stereochemistry | Y            |
     +---------------------+-----------------+--------------+
 
     **NOTE**: the above signature only applies for the default arguments, as the bond type and
@@ -44,6 +47,9 @@ class MultiHotBondFeaturizer(VectorFeaturizer[Bond]):
     References
     ----------
     .. [1] https://www.rdkit.org/docs/source/rdkit.Chem.rdchem.html#rdkit.Chem.rdchem.BondStereo.values
+    .. [2] Spiekermann, K.A.; Dong, X.; Menon, A.; Green, W.H.; Pfeifle, M.; Sandfort, F.; Welz, O.;
+        Bergeler, M. "Accurately Predicting Barrier Heights for Radical Reactions in Solution Using Deep Graph Networks."
+        J. Phys. Chem. A 2024, 128 (39), 8384–8403.
     """
 
     def __init__(
@@ -58,7 +64,7 @@ class MultiHotBondFeaturizer(VectorFeaturizer[Bond]):
         self.stereo = stereos or range(6)
 
     def __len__(self):
-        return 1 + len(self.bond_types) + 2 + (len(self.stereo) + 1)
+        return 1 + len(self.bond_types) + 8 + (len(self.stereo) + 1)
 
     def __call__(self, b: Bond) -> np.ndarray:
         x = np.zeros(len(self), int)
@@ -76,7 +82,9 @@ class MultiHotBondFeaturizer(VectorFeaturizer[Bond]):
 
         x[i] = int(b.GetIsConjugated())
         x[i + 1] = int(b.IsInRing())
-        i += 2
+        for j, size in enumerate([3, 4, 5, 6, 7, 8]):
+            x[i + 2 + j] = int(b.IsInRingSize((size)))
+        i += 8
 
         stereo_bit, _ = self.one_hot_index(int(b.GetStereo()), self.stereo)
         x[i + stereo_bit] = 1
