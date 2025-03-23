@@ -259,11 +259,10 @@ class ConformalQuantileRegressionPredictor(UncertaintyPredictor):
     @staticmethod
     def reformat_preds(preds):
         """
-        Reformat predictions to the midpoint between the upper and lower quantiles.
+        Return the median as the pridition outputs.
         """
         num_data, num_tasks = preds.shape
-        reshaped_preds = preds.reshape(num_data, 2, num_tasks // 2).mean(axis=1)
-        return reshaped_preds
+        return preds.reshape(num_data, 3, num_tasks // 3)[:, 1]
 
     @staticmethod
     def make_intervals(preds):
@@ -271,9 +270,13 @@ class ConformalQuantileRegressionPredictor(UncertaintyPredictor):
         Make uncalibrated intervals from the uncalibrated predictions.
         """
         num_data, num_tasks = preds.shape
-        intervals = abs(np.diff(preds.reshape(num_data, 2, num_tasks // 2), axis=1) / 2)
-        intervals = intervals.reshape(num_data, num_tasks // 2)
-        return intervals
+        reshaped_preds = preds.reshape(num_data, 3, num_tasks // 3)
+        lower_bounds = reshaped_preds[:, 0]
+        upper_bounds = reshaped_preds[:, -1]
+
+        intervals = abs((upper_bounds - lower_bounds) / 2)
+
+        return intervals, upper_bounds, lower_bounds
 
     def calculate_predictions(self):
         for i, (model, scaler_list) in enumerate(
@@ -348,7 +351,9 @@ class ConformalQuantileRegressionPredictor(UncertaintyPredictor):
             )
         else:
             uncal_preds = sum_preds / self.num_models
-            self.uncal_intervals = self.make_intervals(uncal_preds)
+            self.uncal_intervals, self.uncal_upper_bounds, self.uncal_lower_bounds = (
+                self.make_intervals(uncal_preds)
+            )
             if self.individual_ensemble_predictions:
                 self.individual_preds = individual_preds.tolist()
             self.uncal_preds = self.reformat_preds(uncal_preds)
@@ -1441,7 +1446,7 @@ class DirichletPredictor(UncertaintyPredictor):
             alphas = np.array(alphas)
             S = np.sum(alphas, axis=2)
             num_classes = alphas.shape[2]
-            u =  num_classes / S
+            u = num_classes / S
 
             if i == 0:
                 sum_preds = np.array(preds)
@@ -1545,7 +1550,7 @@ def build_uncertainty_predictor(
         "evidential_aleatoric": EvidentialAleatoricPredictor,
         "dropout": DropoutPredictor,
         "spectra_roundrobin": RoundRobinSpectraPredictor,
-        "dirichlet":  DirichletPredictor,
+        "dirichlet": DirichletPredictor,
         "conformal_quantile_regression": ConformalQuantileRegressionPredictor,
         "conformal_regression": ConformalRegressionPredictor,
     }

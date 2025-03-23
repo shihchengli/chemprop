@@ -49,9 +49,8 @@ def cross_validate(args: TrainArgs,
         ignore_columns=args.ignore_columns,
         loss_function=args.loss_function,
     )
-
-    args.quantiles = [args.quantile_loss_alpha / 2] * (args.num_tasks // 2) + [1 - args.quantile_loss_alpha / 2] * (
-        args.num_tasks // 2
+    args.quantiles = [args.quantile_loss_alpha / 2] * (args.num_tasks // 3) + [0.5] * (args.num_tasks // 3) + [1 - args.quantile_loss_alpha / 2] * (
+        args.num_tasks // 3
     )
 
     # Print command line
@@ -147,9 +146,10 @@ def cross_validate(args: TrainArgs,
 
             if args.show_individual_scores:
                 if args.loss_function == "quantile_interval" and metric == "quantile":
-                    num_tasks = len(args.task_names) // 2
+                    num_tasks = len(args.task_names) // 3
                     task_names = args.task_names[:num_tasks]
                     task_names = [f"{task_name} lower" for task_name in task_names] + [
+                                  f"{task_name} median" for task_name in task_names] + [
                                   f"{task_name} upper" for task_name in task_names]
                 else:
                     task_names = args.task_names
@@ -203,9 +203,10 @@ def cross_validate(args: TrainArgs,
             writer.writerow(row)
         else: # all other data types, separate scores by task
             if args.loss_function == "quantile_interval" and metric == "quantile":
-                num_tasks = len(args.task_names) // 2
+                num_tasks = len(args.task_names) // 3
                 task_names = args.task_names[:num_tasks]
                 task_names = [f"{task_name} (lower quantile)" for task_name in task_names] + [
+                                f"{task_name} (median)" for task_name in task_names] + [
                                 f"{task_name} (upper quantile)" for task_name in task_names]
             else:
                 task_names = args.task_names

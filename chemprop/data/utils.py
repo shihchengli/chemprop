@@ -91,7 +91,7 @@ def get_task_names(
     """
     if target_columns is not None:
         if loss_function == "quantile_interval":
-            return target_columns * 2
+            return target_columns * 3
         return target_columns
 
     columns = get_header(path)
@@ -104,7 +104,7 @@ def get_task_names(
     target_names = [column for column in columns if column not in ignore_columns]
 
     if loss_function == "quantile_interval":
-        target_names = target_names * 2
+        target_names = target_names * 3
 
     return target_names
 
@@ -478,7 +478,7 @@ def get_data(path: str,
             loss_function=loss_function,
         )
     elif loss_function == 'quantile_interval':
-        target_columns = target_columns * 2
+        target_columns = target_columns * 3
 
     # Find targets provided as inequalities
     if loss_function == 'bounded_mse':

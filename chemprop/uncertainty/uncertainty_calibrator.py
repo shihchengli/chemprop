@@ -1122,6 +1122,9 @@ class ConformalRegressionCalibrator(UncertaintyCalibrator):
     def calibrate(self):
         uncal_preds = np.array(self.calibration_predictor.get_uncal_preds())  # shape(data, tasks)
         uncal_interval = np.array(self.calibration_predictor.get_uncal_output())
+        uncal_upper_bounds = np.array(self.calibration_predictor.uncal_upper_bounds)
+        uncal_lower_bounds = np.array(self.calibration_predictor.uncal_lower_bounds)
+        
         targets = np.array(self.calibration_data.targets())
         mask = np.array(self.calibration_data.mask())
         num_data = uncal_interval.shape[0]
@@ -1129,10 +1132,14 @@ class ConformalRegressionCalibrator(UncertaintyCalibrator):
         if self.calibration_data.is_atom_bond_targets:
             uncal_preds = [np.concatenate(x) for x in zip(*uncal_preds)]
             uncal_interval = [np.concatenate(x) for x in zip(*uncal_interval)]
+            uncal_upper_bounds = [np.concatenate(x) for x in zip(*uncal_upper_bounds)]
+            uncal_lower_bounds = [np.concatenate(x) for x in zip(*uncal_lower_bounds)]
             targets = [np.concatenate(x) for x in zip(*targets)]
         else:
             uncal_preds = np.array(list(zip(*uncal_preds)))
             uncal_interval = np.array(list(zip(*uncal_interval)))
+            uncal_upper_bounds = np.array(list(zip(*uncal_upper_bounds)))
+            uncal_lower_bounds = np.array(list(zip(*uncal_lower_bounds)))
             targets = targets.astype(float)
             targets = np.array(list(zip(*targets)))
 
@@ -1140,10 +1147,8 @@ class ConformalRegressionCalibrator(UncertaintyCalibrator):
         for i in range(self.num_tasks):
             task_mask = mask[i]
             task_targets = targets[i][task_mask]
-            task_preds = uncal_preds[i][task_mask]
-            task_interval = uncal_interval[i][task_mask]
-            uncal_interval_lower = task_preds - task_interval
-            uncal_interval_upper = task_preds + task_interval
+            uncal_interval_upper = uncal_upper_bounds[i][task_mask]
+            uncal_interval_lower = uncal_lower_bounds[i][task_mask]
             calibration_scores = np.maximum(
                 uncal_interval_lower - task_targets, task_targets - uncal_interval_upper
             )

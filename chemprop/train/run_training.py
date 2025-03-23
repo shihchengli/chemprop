@@ -455,13 +455,15 @@ def run_training(args: TrainArgs,
                 test_preds_dataframe[bond_target] = values
         else:
             if args.loss_function == "quantile_interval" and metric == "quantile":
-                num_tasks = len(args.task_names) // 2
+                num_tasks = len(args.task_names) // 3
                 task_names = args.task_names[:num_tasks]
                 avg_test_preds = np.array(avg_test_preds)
                 num_data = avg_test_preds.shape[0]
-                preds = avg_test_preds.reshape(num_data, 2, num_tasks).mean(axis=1)
-                intervals = abs(np.diff(avg_test_preds.reshape(num_data, 2, num_tasks), axis=1) / 2)
-                intervals = intervals.reshape(num_data, num_tasks)
+                preds = avg_test_preds.reshape(num_data, 3, num_tasks)[:, 1]
+                reshaped_preds = avg_test_preds.reshape(num_data, 3, num_tasks)
+                lower_bounds = reshaped_preds[:, 0]
+                upper_bounds = reshaped_preds[:, -1]
+                intervals = abs((upper_bounds - lower_bounds) / 2)
                 for i, task_name in enumerate(task_names):
                     test_preds_dataframe[task_name] = [pred[i] for pred in preds]
                 for i, task_name in enumerate(task_names):
