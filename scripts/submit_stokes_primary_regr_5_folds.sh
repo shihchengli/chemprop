@@ -108,6 +108,7 @@ done
 test_path=../data/broad_smiles_validated_full.csv
 for i in 0 1 2 3 4 5 6 7 8 9
 do
+    val_path=../data/$dataset/fold_$i/val.csv
     # 1. ensemble
     results_dir=../models/5_folds/random/$dataset/ensembles
     python $chemprop_dir/predict.py \
@@ -115,12 +116,12 @@ do
     --smiles_columns  SMILES \
     --features_generator rdkit_2d_normalized \
     --no_features_scaling \
-    --checkpoint_dir $results_dir/fold_$i \
-    --preds_path $results_dir/fold_$i/ensemble_unc_preds.csv \
+    --checkpoint_dir $results_dir/$i/fold_0 \
+    --preds_path $results_dir/$i/fold_0/ensemble_unc_preds.csv \
     --no_cuda \
     --uncertainty_method ensemble \
     --evaluation_methods nll spearman miscalibration_area \
-    --evaluation_scores_path $results_dir/fold_$i/ensemble_unc_evaluation_scores.csv
+    --evaluation_scores_path $results_dir/$i/fold_0/ensemble_unc_evaluation_scores.csv
 
     # 2. dropout
     results_dir=../models/5_folds/random/$dataset/dropout
@@ -129,14 +130,14 @@ do
     --smiles_columns  SMILES \
     --features_generator rdkit_2d_normalized \
     --no_features_scaling \
-    --checkpoint_dir $results_dir/fold_$i/model_0/ \
-    --preds_path $results_dir/fold_$i/dropout_unc_preds.csv \
+    --checkpoint_dir $results_dir/$i/fold_0/model_0/ \
+    --preds_path $results_dir/$i/fold_0/dropout_unc_preds.csv \
     --uncertainty_method dropout \
     --uncertainty_dropout_p 0.1 \
     --dropout_sampling_size 10 \
     --no_cuda \
     --evaluation_methods nll spearman miscalibration_area \
-    --evaluation_scores_path $results_dir/fold_$i/dropout_unc_evaluation_scores.csv
+    --evaluation_scores_path $results_dir/$i/fold_0/dropout_unc_evaluation_scores.csv
 
     # 3. mve
     results_dir=../models/5_folds/random/$dataset/mve
@@ -145,12 +146,12 @@ do
     --smiles_columns  SMILES \
     --features_generator rdkit_2d_normalized \
     --no_features_scaling \
-    --checkpoint_dir $results_dir/fold_$i \
-    --preds_path $results_dir/fold_$i/mve_unc_preds.csv \
+    --checkpoint_dir $results_dir/$i/fold_0 \
+    --preds_path $results_dir/$i/fold_0/mve_unc_preds.csv \
     --no_cuda \
     --uncertainty_method mve \
     --evaluation_methods nll spearman miscalibration_area \
-    --evaluation_scores_path $results_dir/fold_$i/mve_unc_evaluation_scores.csv
+    --evaluation_scores_path $results_dir/$i/fold_0/mve_unc_evaluation_scores.csv
 
     # 4. evidential
     results_dir=../models/5_folds/random/$dataset/evidential_0.1
@@ -161,12 +162,12 @@ do
         --smiles_columns  SMILES \
         --features_generator rdkit_2d_normalized \
         --no_features_scaling \
-        --checkpoint_dir $results_dir/fold_$i \
-        --preds_path $results_dir/fold_$i/$uncertainty_method\_unc_preds.csv \
+        --checkpoint_dir $results_dir/$i/fold_0 \
+        --preds_path $results_dir/$i/fold_0/$uncertainty_method\_unc_preds.csv \
         --uncertainty_method $uncertainty_method \
         --no_cuda \
         --evaluation_methods nll spearman miscalibration_area \
-        --evaluation_scores_path $results_dir/fold_$i/$uncertainty_method\_unc_evaluation_scores.csv
+        --evaluation_scores_path $results_dir/$i/fold_0/$uncertainty_method\_unc_evaluation_scores.csv
     done
 
     # 5. quantile regression
@@ -179,8 +180,8 @@ do
         --features_generator rdkit_2d_normalized \
         --no_features_scaling \
         --no_cuda \
-        --checkpoint_dir $results_dir/fold_$i \
-        --preds_path $results_dir/fold_$i/conformal_unc_preds.csv
+        --checkpoint_dir $results_dir/$i/fold_0 \
+        --preds_path $results_dir/$i/fold_0/conformal_unc_preds.csv
     done
 
     # 6. conformal quantile regression
@@ -197,8 +198,8 @@ do
         --calibration_method conformal_quantile_regression \
         --conformal_alpha $alpha \
         --evaluation_methods conformal_coverage \
-        --evaluation_scores_path $results_dir/fold_$i/cqr_unc_eval.csv \
-        --checkpoint_dir $results_dir/fold_$i \
-        --preds_path $results_dir/fold_$i/cqr_unc_preds.csv
+        --evaluation_scores_path $results_dir/$i/fold_0/cqr_unc_eval.csv \
+        --checkpoint_dir $results_dir/$i/fold_0 \
+        --preds_path $results_dir/$i/fold_0/cqr_unc_preds.csv
     done
 done

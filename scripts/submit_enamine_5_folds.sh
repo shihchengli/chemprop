@@ -8,7 +8,7 @@ train_path=../data/$dataset.csv
 
 # Model training
 # 1. ensembles
-results_dir=../models/5_folds/random/$dataset/ensembles/$i
+results_dir=../models/5_folds/random/$dataset/ensembles
 python $chemprop_dir/train.py \
 --dataset_type regression \
 --data_path $train_path \
